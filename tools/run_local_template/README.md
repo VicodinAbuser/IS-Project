@@ -1,4 +1,6 @@
-# Option A: run everything on your laptop
+# Option A: run everything on your laptop ({{ORACLE}})
+
+> This folder is set up for **{{ORACLE}}** (service name **`{{SERVICE}}`**). Using {{OTHER}} instead? Download **[{{OTHER_FOLDER}}.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/{{OTHER_FOLDER}}.zip)**.
 
 In this option **your laptop is the server** for all three tiers. Nothing is hosted online, and nothing needs internet once it's installed. It's the most reliable setup for a classroom demo.
 
@@ -11,7 +13,7 @@ Your laptop
 │     └── API calls ──►  Backend (FastAPI)  http://localhost:8000        │  Application tier
 │                        started by 3-start-backend.bat                  │  (= uvicorn app.main:app)
 │                              │                                         │
-│                              └── SQL / PL/SQL ──►  Oracle 26ai Free    │  Data tier
+│                              └── SQL / PL/SQL ──►  {{ORACLE_BOX}}│  Data tier
 │                                                    localhost:1521      │
 │                                                    (Windows service)   │
 │  SQL Developer ──────────────────────────────────►  same database     │
@@ -28,7 +30,7 @@ So the command means: *start the application server and run the FastAPI app defi
 **This folder is complete on its own.** It contains all the code needed to run the app:
 
 ```
-run-local/
+{{FOLDER}}/
 ├── START-APP.bat, 1-install.bat, 2-setup-database.bat …   double-click scripts
 ├── README.md            this guide
 ├── ORACLE_SETUP.md      detailed Oracle + SQL Developer help
@@ -45,27 +47,27 @@ run-local/
 
 | Software | Notes |
 |---|---|
-| **Oracle AI Database 26ai Free** *or* **Oracle Database 21c** (`WINDOWS.X64_213000_db_home.zip`) | Write down the **password** you choose during install (the SYSTEM password). Install steps for both: [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A. |
-| **Oracle SQL Developer** | 21c usually includes it (`sqldeveloper` folder inside the Oracle folder). Otherwise download the Windows 64-bit version **with JDK included**, unzip it and run `sqldeveloper.exe`. |
+| **{{ORACLE}}**{{ORACLE_FILE}} | Write down the **password** you choose during install (the SYSTEM password). Install steps: [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A. |
+| **Oracle SQL Developer** | {{SQLDEV}}ownload the Windows 64-bit version **with JDK included**, unzip it and run `sqldeveloper.exe`. |
 | **Python 3.10+** from python.org | On the first installer screen, tick **"Add python.exe to PATH"**. |
 | **Node.js 18+ (LTS)** from nodejs.org | Click Next through the installer. |
 
 You **don't** need to set any environment variables.
 
 ### Step 2: Download this folder
-Download **run-local.zip** directly:
-https://github.com/VicodinAbuser/IS-Project/raw/main/run-local.zip
+Download **{{FOLDER}}.zip** directly:
+https://github.com/VicodinAbuser/IS-Project/raw/main/{{FOLDER}}.zip
 
-Right-click the zip → **Extract All…**, to for example `C:\IS-Project`. You get a `run-local` folder; everything below happens inside it.
+Right-click the zip → **Extract All…**, to for example `C:\IS-Project`. You get a `{{FOLDER}}` folder; everything below happens inside it.
 *(Keep the folder structure as it is. The scripts look for `backend`, `frontend` and `database` next to them.)*
 
-### Step 3: Double-click `run-local\1-install.bat`
+### Step 3: Double-click `{{FOLDER}}\1-install.bat`
 This installs the Python packages (backend) and Node packages (website). It takes about 3–10 minutes. It should end with **"Install finished"**.
 
-### Step 4: Double-click `run-local\2-setup-database.bat`
+### Step 4: Double-click `{{FOLDER}}\2-setup-database.bat`
 It asks three things:
 ```
-Service name [FREEPDB1]:   ← press Enter for Oracle 26ai Free, or type ORCLPDB for Oracle 21c
+Service name [{{SERVICE}}]:{{PAD}}← press Enter ({{SERVICE}} is right for {{ORACLE_SHORT}}; type your own name only if you chose a different one)
 Port [1521]:               ← press Enter
 Oracle SYSTEM password:    ← the password from the Oracle install (nothing appears while you type)
 ```
@@ -77,14 +79,14 @@ It creates:
 It also saves your service name in `backend\.env`, so the app connects to the same database. You don't need to set any environment variables.
 
 ### Step 5: Connect SQL Developer (for showing the database)
-New connection: **Username** `inventory`, **Password** `inventory123`, **Hostname** `localhost`, **Port** `1521`, **Service name** `FREEPDB1` (26ai) or `ORCLPDB` (21c).
+New connection: **Username** `inventory`, **Password** `inventory123`, **Hostname** `localhost`, **Port** `1521`, **Service name** `{{SERVICE}}`.
 Expand it to see **Tables**, **Views**, **Packages** and **Triggers**.
 
 ---
 
 ## Every time you use the app
 
-**Double-click `run-local\START-APP.bat`**
+**Double-click `{{FOLDER}}\START-APP.bat`**
 
 It opens two windows, **Backend** and **Website**, and then the browser at **http://localhost:4200** after about 30 seconds.
 
@@ -95,7 +97,7 @@ It opens two windows, **Backend** and **Website**, and then the browser at **htt
 Oracle starts automatically with Windows, so you don't need to start it yourself.
 
 ### The same thing by hand (if you prefer typing commands)
-Open **Command Prompt** in the `run-local` folder.
+Open **Command Prompt** in the `{{FOLDER}}` folder.
 
 Window 1, the backend:
 ```bat
@@ -141,9 +143,8 @@ Then open http://localhost:4200.
 | `[X] Python was not found` | Reinstall Python and tick **"Add python.exe to PATH"**, then open a new window |
 | `Could not log in as SYSTEM ... ORA-01017` | Wrong SYSTEM password. Use the one from the Oracle install. |
 | `Could not connect ... DPY-6005` or `ORA-12541` | Oracle isn't running. Open **Services** (Win+R → `services.msc`) and start the services whose names begin with **Oracle**. |
-| `ORA-12514` (service not registered) | Wrong service name. Run `2-setup-database.bat` again: `FREEPDB1` for 26ai, `ORCLPDB` for 21c. |
-| `ORA-01109: database not open` (21c) | See [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A, Option 2, step 6 |
-| Website says *Cannot reach the backend* | The Backend window was closed or shows an error. Run `3-start-backend.bat`. |
+| `ORA-12514` (service not registered) | Wrong service name. Run `2-setup-database.bat` again and type the pluggable database name you chose in the Oracle installer (default `{{SERVICE}}`). |
+{{ORA01109_ROW}}| Website says *Cannot reach the backend* | The Backend window was closed or shows an error. Run `3-start-backend.bat`. |
 | Website says *Cannot connect to the Oracle database* | Backend is fine but Oracle isn't running (see above) |
 | Login page **Test** shows *backend up, Oracle not reachable* | Same: start Oracle |
 | Browser page is blank or can't connect | The website is still starting. Wait for "Local: http://localhost:4200/" in the Website window and refresh. |

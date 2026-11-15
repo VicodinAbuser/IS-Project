@@ -1,0 +1,3 @@
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; @media (max-width: 900px) { grid-template-columns: 1fr; } }
+.head { display: flex; justify-content: space-between; align-items: baseline; }
+.alarm { border-color: var(--warning); background: var(--warning-soft); .value { color: var(--warning); } }

@@ -1,0 +1,33 @@
+<div class="page-head"><div><h1>My orders</h1><p class="muted">Payment and delivery status for everything you've bought</p></div></div>
+@if (error()) { <div class="alert error">{{ error() }}</div> }
+<div class="grid">
+  @for (o of orders(); track o.id) {
+    <div class="card order">
+      <div class="top">
+        <div><strong>Order #{{ o.id }}</strong> <span class="muted">· {{ o.created_at | date: 'medium' }} · {{ o.outlet.name }}</span></div>
+        <div class="badges">
+          <span class="badge {{ o.status }}">{{ label(o.status) }}</span>
+          <span class="badge {{ o.payment?.status }}">Payment: {{ label(o.payment?.status ?? '') }}</span>
+        </div>
+      </div>
+      <div class="items">
+        @for (i of o.items; track i.product_id) { <span>{{ i.product.name }} × {{ i.quantity }}</span> }
+      </div>
+      @if (o.status === 'PAID') {
+        <ol class="track">
+          @for (s of steps; track s; let idx = $index) {
+            <li [class.done]="idx <= stepIndex(o)">{{ label(s) }}</li>
+          }
+        </ol>
+        @if (o.delivery?.tracking_number) { <p class="muted small">{{ o.delivery?.courier }} · Tracking {{ o.delivery?.tracking_number }}</p> }
+      }
+      <div class="bottom">
+        <strong>{{ o.total_amount | currency: 'INR' }}</strong>
+        <div class="actions">
+          @if (o.status === 'PENDING_PAYMENT') { <a class="btn sm" [routerLink]="['/checkout', o.id]">Pay now</a> }
+          @if (canCancel(o)) { <button class="btn secondary sm" (click)="cancel(o)">Cancel order</button> }
+        </div>
+      </div>
+    </div>
+  } @empty { <div class="card empty">No orders yet. <a routerLink="/shop">Start shopping</a></div> }
+</div>

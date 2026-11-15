@@ -1,0 +1,43 @@
+<div class="page-head"><div><h1>Orders</h1><p class="muted">Payment status and delivery tracking for every order</p></div></div>
+@if (error()) { <div class="alert error">{{ error() }}</div> }
+<div class="card form-row">
+  <div><label for="st">Order status</label>
+    <select id="st" [(ngModel)]="filter.status" (ngModelChange)="load()"><option value="">All</option>
+      <option value="PENDING_PAYMENT">Pending payment</option><option value="PAID">Paid</option><option value="CANCELLED">Cancelled</option><option value="RETURNED">Returned</option></select></div>
+  <div><label for="ds">Delivery status</label>
+    <select id="ds" [(ngModel)]="filter.delivery_status" (ngModelChange)="load()"><option value="">All</option>
+      @for (d of deliveryStatuses; track d) { <option [value]="d">{{ label(d) }}</option> }</select></div>
+  <div><label for="ou">Outlet</label>
+    <select id="ou" [(ngModel)]="filter.outlet_id" (ngModelChange)="load()"><option [ngValue]="null">All</option>
+      @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+</div>
+<div class="card table-wrap mt">
+  <table>
+    <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Outlet</th><th>Items</th><th class="right">Amount</th><th>Payment</th><th>Delivery</th><th></th></tr></thead>
+    <tbody>
+      @for (o of orders(); track o.id) {
+        <tr>
+          <td>{{ o.id }}</td><td>{{ o.created_at | date: 'dd MMM yy' }}</td>
+          <td>{{ o.customer.name }}<br /><span class="muted small">{{ o.customer.email }}</span></td>
+          <td>{{ o.outlet.name }}</td>
+          <td class="small">@for (i of o.items; track i.product_id) { <div>{{ i.product.name }} × {{ i.quantity }}</div> }</td>
+          <td class="right">{{ o.total_amount | currency: 'INR' }}</td>
+          <td><span class="badge {{ o.payment?.status }}">{{ o.payment?.status }}</span>
+            @if (o.payment?.method) { <div class="muted small">{{ o.payment?.method }}</div> }</td>
+          <td>
+            @if (o.status === 'PAID') {
+              <div class="delivery">
+                <select [(ngModel)]="edits[o.id].status">@for (d of deliveryStatuses; track d) { <option [value]="d">{{ label(d) }}</option> }</select>
+                <input placeholder="Courier" [(ngModel)]="edits[o.id].courier" />
+                <input placeholder="Tracking #" [(ngModel)]="edits[o.id].tracking_number" />
+                <button class="btn sm" (click)="saveDelivery(o)">Save</button>
+              </div>
+            } @else { <span class="badge {{ o.status }}">{{ label(o.status) }}</span> }
+          </td>
+          <td>@if (o.status !== 'CANCELLED' && ['NOT_SHIPPED', 'PACKED'].includes(o.delivery?.status ?? '')) {
+            <button class="btn secondary sm" (click)="cancel(o)">Cancel</button> }</td>
+        </tr>
+      } @empty { <tr><td colspan="9" class="empty">No orders match.</td></tr> }
+    </tbody>
+  </table>
+</div>

@@ -13,7 +13,7 @@ The project works with **either** of these. Both were tested.
 
 > **SQL Developer is Oracle's tool.** MySQL Workbench cannot open an Oracle database.
 
-> Prefer double-click scripts? Install Oracle (Part A), then follow [run-local/README.md](../run-local/README.md); it automates Parts B–D.
+> Prefer double-click scripts? Install Oracle (Part A), then follow the README in [run-local-oracle21c](../run-local-oracle21c/README.md) or [run-local-oracle26ai](../run-local-oracle26ai/README.md); it automates Parts B–D.
 
 ## What you need
 - Windows 10/11 (64-bit), at least 8 GB RAM, 10–15 GB free disk
@@ -54,7 +54,7 @@ The installer registers Oracle as Windows services that start automatically. It 
 ## Part C: Create the project user, tables and demo data
 
 ### Easiest: let the script do it
-After installing the Python packages (`run-local\1-install.bat`, or `pip install -r requirements.txt`), double-click `run-local\2-setup-database.bat`, or run `python setup_db.py --create-user` in `backend`. It asks:
+After installing the Python packages (`1-install.bat`, or `pip install -r requirements.txt`), double-click `2-setup-database.bat`, or run `python setup_db.py --create-user` in `backend`. It asks:
 ```
 Service name [FREEPDB1]:     ← press Enter for 26ai, or type ORCLPDB for 21c
 Port [1521]:                 ← press Enter
@@ -72,7 +72,7 @@ It creates everything and saves the service name in `backend\.env`, so the app u
 > Always use **F5 (Run Script)** for these files. **Ctrl+Enter** runs only one statement.
 
 ## Part D: Start the app
-Double-click `run-local\START-APP.bat`, or start the backend (`uvicorn app.main:app`) and the website (`npm start`) by hand. Log in as `admin@inventory.com` / `admin123`.
+Double-click `START-APP.bat`, or start the backend (`uvicorn app.main:app`) and the website (`npm start`) by hand. Log in as `admin@inventory.com` / `admin123`.
 
 ---
 

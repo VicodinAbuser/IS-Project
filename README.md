@@ -37,9 +37,16 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 
 ## How to run
 
-> **Easiest way (Windows):** download **[run-local.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/run-local.zip)**. It's a self-contained copy of everything needed to run on a laptop, with double-click scripts. Then follow [run-local/README.md](run-local/README.md).
+> **Easiest way (Windows):** download the zip for **your** Oracle version. Each is a self-contained copy of everything needed to run on a laptop, with double-click scripts and instructions for that version only.
 >
-> *For developers:* the code is edited in `backend/`, `frontend/` and `database/`. After changing it, run `python tools/build_run_local.py` to refresh `run-local/` and `run-local.zip`.
+> | Your Oracle | Download | Then follow | Service name |
+> |---|---|---|---|
+> | **Oracle Database 21c** (`WINDOWS.X64_213000_db_home.zip`) | **[run-local-oracle21c.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/run-local-oracle21c.zip)** | [run-local-oracle21c/README.md](run-local-oracle21c/README.md) | `ORCLPDB` |
+> | **Oracle AI Database 26ai Free** | **[run-local-oracle26ai.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/run-local-oracle26ai.zip)** | [run-local-oracle26ai/README.md](run-local-oracle26ai/README.md) | `FREEPDB1` |
+>
+> The code inside both is identical; only the default service name and the instructions differ.
+>
+> *For developers:* the code is edited in `backend/`, `frontend/` and `database/`. After changing it, run `python tools/build_run_local.py` to refresh both folders and both zips.
 
 You need:
 - **Oracle AI Database 26ai Free** *or* **Oracle Database 21c** (both tested), installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases). No environment variables needed.

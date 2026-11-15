@@ -1,0 +1,36 @@
+<div class="page-head"><div><h1>Admin dashboard</h1><p class="muted">Live view across all outlets</p></div></div>
+@if (stats(); as s) {
+  <div class="grid stats">
+    <div class="card stat"><div class="label">Total revenue</div><div class="value">{{ s.total_revenue | currency: 'INR' : 'symbol' : '1.0-0' }}</div></div>
+    <div class="card stat"><div class="label">Paid orders</div><div class="value">{{ s.paid_orders | number }}</div></div>
+    <div class="card stat"><div class="label">Awaiting shipment</div><div class="value">{{ s.to_ship }}</div></div>
+    <div class="card stat"><div class="label">Pending payment</div><div class="value">{{ s.pending_payment }}</div></div>
+    <div class="card stat"><div class="label">Units in stock</div><div class="value">{{ s.total_units_in_stock | number }}</div></div>
+    <div class="card stat"><div class="label">Products · Outlets</div><div class="value">{{ s.products }} · {{ s.outlets }}</div></div>
+    <div class="card stat" [class.alarm]="s.low_stock_items"><div class="label">Low-stock alerts</div><div class="value">{{ s.low_stock_items }}</div></div>
+  </div>
+}
+<div class="two mt">
+  <div class="card table-wrap">
+    <div class="head"><h2>⚠ Low stock</h2><a routerLink="/admin/inventory">Restock →</a></div>
+    <table>
+      <thead><tr><th>Product</th><th>Outlet</th><th class="right">Qty</th><th class="right">Reorder at</th></tr></thead>
+      <tbody>
+        @for (r of lowStock(); track r.product_id + '-' + r.outlet_id) {
+          <tr><td>{{ r.product_name }}</td><td>{{ r.outlet_name }}</td><td class="right"><strong>{{ r.quantity }}</strong></td><td class="right">{{ r.reorder_level }}</td></tr>
+        } @empty { <tr><td colspan="4" class="muted">All stock levels healthy.</td></tr> }
+      </tbody>
+    </table>
+  </div>
+  <div class="card table-wrap">
+    <div class="head"><h2>📦 Ready to ship</h2><a routerLink="/admin/orders">All orders →</a></div>
+    <table>
+      <thead><tr><th>Order</th><th>Customer</th><th>Outlet</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        @for (o of toShip(); track o.id) {
+          <tr><td>#{{ o.id }}</td><td>{{ o.customer.name }}</td><td>{{ o.outlet.name }}</td><td class="right">{{ o.total_amount | currency: 'INR' }}</td></tr>
+        } @empty { <tr><td colspan="4" class="muted">Nothing waiting.</td></tr> }
+      </tbody>
+    </table>
+  </div>
+</div>

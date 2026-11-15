@@ -1,0 +1,49 @@
+@if (order(); as o) {
+  @if (o.status === 'PAID') {
+    <div class="card success">
+      <div class="tick">✓</div>
+      <h1>Payment successful</h1>
+      <p class="muted">Order #{{ o.id }} · {{ o.total_amount | currency: 'INR' }} · Ref {{ o.payment?.transaction_ref }}</p>
+      <p>Your order is being packed at <strong>{{ o.outlet.name }}</strong>.</p>
+      <a class="btn" routerLink="/orders">Track my orders</a>
+    </div>
+  } @else if (o.status === 'CANCELLED' || o.status === 'RETURNED') {
+    <div class="card empty">Order #{{ o.id }} was {{ o.status === 'CANCELLED' ? 'cancelled (unpaid orders are cancelled after 30 minutes)' : 'returned' }}. <a routerLink="/shop">Back to shop</a></div>
+  } @else {
+    <div class="layout">
+      <div class="card">
+        <h1>Payment</h1>
+        <p class="muted">Secure demo gateway · Order #{{ o.id }}</p>
+        @if (error()) { <div class="alert error">{{ error() }}</div> }
+        <div class="tabs">
+          @for (m of ['CARD', 'UPI', 'NETBANKING']; track m) {
+            <button type="button" class="tab" [class.on]="method === m" (click)="method = $any(m)">{{ m === 'NETBANKING' ? 'Net banking' : m === 'CARD' ? 'Card' : 'UPI' }}</button>
+          }
+        </div>
+        @switch (method) {
+          @case ('CARD') {
+            <div class="field"><label for="cn">Card number</label><input id="cn" [(ngModel)]="card.number" /></div>
+            <div class="form-row">
+              <div class="field"><label for="ex">Expiry</label><input id="ex" [(ngModel)]="card.expiry" /></div>
+              <div class="field"><label for="cvv">CVV</label><input id="cvv" type="password" [(ngModel)]="card.cvv" /></div>
+            </div>
+          }
+          @case ('UPI') { <div class="field"><label for="upi">UPI ID</label><input id="upi" [(ngModel)]="upiId" /></div> }
+          @case ('NETBANKING') {
+            <div class="field"><label for="bank">Bank</label>
+              <select id="bank" [(ngModel)]="bank"><option>HDFC Bank</option><option>ICICI Bank</option><option>State Bank of India</option><option>Axis Bank</option></select></div>
+          }
+        }
+        <p class="hint muted">Test tip: a card ending in <code>0000</code> or a UPI ID starting with <code>fail</code> simulates a declined payment.</p>
+        <button class="btn full" (click)="pay()" [disabled]="paying()">{{ paying() ? 'Processing…' : 'Pay ' + (o.total_amount | currency: 'INR') }}</button>
+      </div>
+      <aside class="card">
+        <h2>Order summary</h2>
+        @for (i of o.items; track i.product_id) {
+          <div class="line"><span>{{ i.product.name }} × {{ i.quantity }}</span><span>{{ i.unit_price * i.quantity | currency: 'INR' }}</span></div>
+        }
+        <div class="line total"><span>Total</span><span>{{ o.total_amount | currency: 'INR' }}</span></div>
+      </aside>
+    </div>
+  }
+} @else if (error()) { <div class="alert error">{{ error() }}</div> }
