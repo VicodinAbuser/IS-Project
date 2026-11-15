@@ -37,7 +37,9 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 
 ## How to run
 
-> **Easiest way (Windows):** use the double-click scripts and guide in **[run-local/](run-local/README.md)**: install once, then `START-APP.bat` every time.
+> **Easiest way (Windows):** download **[run-local.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/run-local.zip)**. It's a self-contained copy of everything needed to run on a laptop, with double-click scripts. Then follow [run-local/README.md](run-local/README.md).
+>
+> *For developers:* the code is edited in `backend/`, `frontend/` and `database/`. After changing it, run `python tools/build_run_local.py` to refresh `run-local/` and `run-local.zip`.
 
 You need:
 - **Oracle AI Database 26ai Free**, installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases)

@@ -1,0 +1,11 @@
+.auth { max-width: 420px; margin: 48px auto; }
+.full { width: 100%; margin-top: 4px; }
+.demo { display: flex; gap: 8px; align-items: center; margin: 18px 0 4px; font-size: 14px; }
+
+.server { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  code { word-break: break-all; }
+  label { width: 100%; }
+  .row { display: flex; gap: 6px; width: 100%; }
+  .links { margin-left: auto; display: flex; gap: 10px; } }
+.link { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }

@@ -25,7 +25,17 @@ Your laptop
 
 So the command means: *start the application server and run the FastAPI app defined in `backend/app/main.py`*. It must be run inside the `backend` folder, using the Python environment created by `1-install.bat`. `3-start-backend.bat` does exactly that for you.
 
-This folder contains only the guide and the start scripts. The application code is the same as for Option B, in `../backend`, `../frontend` and `../database`.
+**This folder is complete on its own.** It contains all the code needed to run the app:
+
+```
+run-local/
+├── START-APP.bat, 1-install.bat, 2-setup-database.bat …   double-click scripts
+├── README.md            this guide
+├── ORACLE_SETUP.md      detailed Oracle + SQL Developer help
+├── backend/             Python code (application server); app/main.py is what uvicorn starts
+├── frontend/            Angular website code (src/app/...)
+└── database/            Oracle SQL: tables, PL/SQL package, trigger, views, demo data, demo queries
+```
 
 ---
 
@@ -35,15 +45,19 @@ This folder contains only the guide and the start scripts. The application code 
 
 | Software | Notes |
 |---|---|
-| **Oracle AI Database 26ai Free** (Windows) | Write down the **password** you choose during install (the SYSTEM password). See [../docs/ORACLE_SETUP.md](../docs/ORACLE_SETUP.md) steps 1–2. |
+| **Oracle AI Database 26ai Free** (Windows) | Write down the **password** you choose during install (the SYSTEM password). See [ORACLE_SETUP.md](ORACLE_SETUP.md) steps 1–2. |
 | **Oracle SQL Developer** | Windows 64-bit **with JDK included**. Just unzip and run `sqldeveloper.exe`. |
 | **Python 3.10+** from python.org | On the first installer screen, tick **"Add python.exe to PATH"**. |
 | **Node.js 18+ (LTS)** from nodejs.org | Click Next through the installer. |
 
 You **don't** need to set any environment variables.
 
-### Step 2: Get the project
-On GitHub, click **Code → Download ZIP** and unzip it, for example to `C:\IS-Project`. Or run `git clone`.
+### Step 2: Download this folder
+Download **run-local.zip** directly:
+https://github.com/VicodinAbuser/IS-Project/raw/main/run-local.zip
+
+Right-click the zip → **Extract All…**, to for example `C:\IS-Project`. You get a `run-local` folder; everything below happens inside it.
+*(Keep the folder structure as it is. The scripts look for `backend`, `frontend` and `database` next to them.)*
 
 ### Step 3: Double-click `run-local\1-install.bat`
 This installs the Python packages (backend) and Node packages (website). It takes about 3–10 minutes. It should end with **"Install finished"**.
@@ -73,7 +87,7 @@ It opens two windows, **Backend** and **Website**, and then the browser at **htt
 Oracle starts automatically with Windows, so you don't need to start it yourself.
 
 ### The same thing by hand (if you prefer typing commands)
-Open **Command Prompt** in the project folder.
+Open **Command Prompt** in the `run-local` folder.
 
 Window 1, the backend:
 ```bat
@@ -125,4 +139,4 @@ Then open http://localhost:4200.
 | Browser page is blank or can't connect | The website is still starting. Wait for "Local: http://localhost:4200/" in the Website window and refresh. |
 | `Port 8000/4200 is already in use` | The app is already running in another window. Close the old windows first. |
 
-More Oracle help: [../docs/ORACLE_SETUP.md](../docs/ORACLE_SETUP.md)
+More Oracle help: [ORACLE_SETUP.md](ORACLE_SETUP.md)

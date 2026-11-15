@@ -4,7 +4,7 @@ rem ===================================================================
 rem  OPTIONAL, e.g. just before the presentation: rebuilds the tables,
 rem  package and views and reloads fresh demo data. Deletes all changes!
 rem ===================================================================
-cd /d "%~dp0..\backend"
+cd /d "%~dp0backend"
 if not exist ".venv\Scripts\python.exe" goto noinstall
 
 echo This DELETES all current data in the INVENTORY schema and loads fresh demo data.

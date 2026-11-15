@@ -1,0 +1,12 @@
+.layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start;
+  @media (max-width: 800px) { grid-template-columns: 1fr; } }
+.tabs { display: flex; gap: 6px; margin: 16px 0; }
+.tab { flex: 1; padding: 10px; border: 1px solid var(--border); background: #fff; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+  &.on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); } }
+.hint { font-size: 13px; }
+.line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+.total { font-weight: 700; font-size: 17px; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+.full { width: 100%; }
+.success { text-align: center; max-width: 520px; margin: 40px auto; padding: 36px; }
+.tick { width: 56px; height: 56px; border-radius: 50%; background: var(--success-soft); color: var(--success); font-size: 28px;
+  display: grid; place-items: center; margin: 0 auto 12px; }

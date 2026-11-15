@@ -1,0 +1,37 @@
+<div class="page-head">
+  <div><h1>Shop</h1><p class="muted">Choose the outlet nearest to you to see what's in stock there.</p></div>
+</div>
+<div class="card filters form-row">
+  <div><label for="outlet">Outlet</label>
+    <select id="outlet" [(ngModel)]="outletId" (ngModelChange)="changeOutlet()">
+      @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }} ({{ o.city }})</option> }
+    </select></div>
+  <div><label for="cat">Category</label>
+    <select id="cat" [(ngModel)]="categoryId" (ngModelChange)="load()">
+      <option [ngValue]="null">All categories</option>
+      @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+    </select></div>
+  <div><label for="search">Search</label><input id="search" placeholder="Name or SKU" [(ngModel)]="search" (keyup.enter)="load()" (input)="load()" /></div>
+</div>
+@if (error()) { <div class="alert error mt">{{ error() }}</div> }
+<div class="products mt">
+  @for (p of products(); track p.id) {
+    <article class="card product">
+      <img [src]="p.image_url" [alt]="p.name" loading="lazy" />
+      <div class="body">
+        <span class="muted sku">{{ p.sku }} · {{ p.category?.name }}</span>
+        <h2>{{ p.name }}</h2>
+        <p class="muted desc">{{ p.description }}</p>
+        <div class="foot">
+          <strong class="price">{{ p.price | currency: 'INR' }}</strong>
+          @if (p.total_stock - inCart(p.id) > 0) {
+            <span class="badge" [class.warning]="p.total_stock <= p.reorder_level" [class.success]="p.total_stock > p.reorder_level">
+              {{ p.total_stock <= p.reorder_level ? 'Only ' + p.total_stock + ' left' : 'In stock' }}</span>
+          } @else { <span class="badge danger">Out of stock</span> }
+        </div>
+        <button class="btn full" (click)="add(p)" [disabled]="p.total_stock - inCart(p.id) <= 0">
+          {{ added() === p.id ? '✓ Added' : 'Add to cart' }}{{ inCart(p.id) ? ' (' + inCart(p.id) + ')' : '' }}</button>
+      </div>
+    </article>
+  } @empty { <div class="empty card">No products found.</div> }
+</div>

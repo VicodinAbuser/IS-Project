@@ -1,0 +1,34 @@
+<div class="page-head">
+  <div><h1>Quarterly reports</h1><p class="muted">Collective sales across all outlets, calculated from the database</p></div>
+  <div class="controls">
+    <select [(ngModel)]="year" (ngModelChange)="load()" aria-label="Year">@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
+    <select [(ngModel)]="quarter" (ngModelChange)="load()" aria-label="Quarter">
+      @for (q of [1, 2, 3, 4]; track q) { <option [ngValue]="q">Q{{ q }}</option> }</select>
+    <button class="btn secondary" (click)="download('csv')" [disabled]="downloading()">⬇ CSV</button>
+    <button class="btn" (click)="download('xlsx')" [disabled]="downloading()">⬇ Excel</button>
+  </div>
+</div>
+@if (error()) { <div class="alert error">{{ error() }}</div> }
+@if (report(); as r) {
+  <p class="muted">{{ r.period }}</p>
+  <div class="grid stats">
+    <div class="card stat"><div class="label">Revenue</div><div class="value">{{ r.summary.revenue | currency: 'INR' : 'symbol' : '1.0-0' }}</div></div>
+    <div class="card stat"><div class="label">Paid orders</div><div class="value">{{ r.summary.orders | number }}</div></div>
+    <div class="card stat"><div class="label">Units sold</div><div class="value">{{ r.summary.units_sold | number }}</div></div>
+  </div>
+  @if (r.summary.orders) {
+    <div class="charts mt">
+      <div class="card"><h2>Revenue by outlet</h2><canvas #outletChart></canvas></div>
+      <div class="card"><h2>Monthly revenue</h2><canvas #monthChart></canvas></div>
+      <div class="card"><h2>Revenue by category</h2><div class="donut"><canvas #categoryChart></canvas></div></div>
+    </div>
+    <div class="two mt">
+      <div class="card table-wrap"><h2>Top products</h2>
+        <table><thead><tr><th>Product</th><th class="right">Units</th><th class="right">Revenue</th></tr></thead>
+          <tbody>@for (p of r.by_product; track p.sku) { <tr><td>{{ p.product }}</td><td class="right">{{ p.units }}</td><td class="right">{{ p.revenue | currency: 'INR' }}</td></tr> }</tbody></table></div>
+      <div class="card table-wrap"><h2>By outlet</h2>
+        <table><thead><tr><th>Outlet</th><th class="right">Orders</th><th class="right">Units</th><th class="right">Revenue</th></tr></thead>
+          <tbody>@for (o of r.by_outlet; track o.outlet) { <tr><td>{{ o.outlet }}</td><td class="right">{{ o.orders }}</td><td class="right">{{ o.units }}</td><td class="right">{{ o.revenue | currency: 'INR' }}</td></tr> }</tbody></table></div>
+    </div>
+  } @else { <div class="card empty mt">No paid orders in this quarter.</div> }
+}

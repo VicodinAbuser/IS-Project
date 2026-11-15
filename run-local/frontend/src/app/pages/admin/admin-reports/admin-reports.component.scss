@@ -1,0 +1,4 @@
+.controls { display: flex; gap: 8px; select { width: auto; } }
+.charts { display: grid; grid-template-columns: 1.3fr 1.3fr 1fr; gap: 16px; @media (max-width: 1000px) { grid-template-columns: 1fr; } }
+.donut { max-width: 280px; margin: 0 auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; @media (max-width: 900px) { grid-template-columns: 1fr; } }

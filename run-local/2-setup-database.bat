@@ -5,7 +5,7 @@ rem  ONE-TIME: creates the INVENTORY user, tables, PL/SQL package,
 rem  trigger, views and demo data in Oracle 26ai Free on this laptop.
 rem  Oracle must be installed and running.
 rem ===================================================================
-cd /d "%~dp0..\backend"
+cd /d "%~dp0backend"
 if not exist ".venv\Scripts\python.exe" goto noinstall
 
 echo This sets up the project database in Oracle (localhost:1521/FREEPDB1).

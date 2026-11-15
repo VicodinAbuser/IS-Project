@@ -1,0 +1,14 @@
+<div class="auth card">
+  <h1>Create account</h1>
+  <p class="muted">Customers can browse products and place orders</p>
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="field"><label for="name">Full name</label><input id="name" formControlName="name" /></div>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" formControlName="email" /></div>
+    <div class="field"><label for="password">Password (min 6 characters)</label><input id="password" type="password" formControlName="password" /></div>
+    <div class="field"><label for="phone">Phone</label><input id="phone" formControlName="phone" /></div>
+    <div class="field"><label for="address">Delivery address</label><textarea id="address" rows="2" formControlName="address"></textarea></div>
+    <button class="btn full" type="submit" [disabled]="form.invalid">Register</button>
+  </form>
+  <p class="muted">Already registered? <a routerLink="/login">Sign in</a></p>
+</div>

@@ -1,0 +1,8 @@
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap;
+  button { padding: 8px 12px; border: 1px solid var(--border); background: #fff; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+    &.on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); } } }
+.views { display: flex; gap: 6px; flex-wrap: wrap; }
+.toolbar { margin-bottom: 12px; max-width: 520px; }
+.chk { display: flex; align-items: center; gap: 8px; font-weight: 600; padding-bottom: 10px; input { width: auto; } }
+.full { width: 100%; }
+.pos { color: var(--success); font-weight: 700; } .neg { color: var(--danger); font-weight: 700; }

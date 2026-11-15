@@ -4,7 +4,7 @@ rem ===================================================================
 rem  Presentation tier: serves the Angular website at http://localhost:4200
 rem  Same as typing, inside frontend\:   npm start
 rem ===================================================================
-cd /d "%~dp0..\frontend"
+cd /d "%~dp0frontend"
 if not exist "node_modules" goto noinstall
 
 echo Website: http://localhost:4200  (ready when you see "Local: http://localhost:4200/")

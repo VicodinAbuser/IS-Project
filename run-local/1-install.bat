@@ -4,7 +4,7 @@ rem ===================================================================
 rem  ONE-TIME: installs the Python and Node.js packages the app needs.
 rem  Requires Python 3.10+ (with "Add python.exe to PATH" ticked) and Node.js 18+.
 rem ===================================================================
-cd /d "%~dp0.."
+cd /d "%~dp0"
 
 echo === Checking Python and Node.js ===
 where python >nul 2>nul

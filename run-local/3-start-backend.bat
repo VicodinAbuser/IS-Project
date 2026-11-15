@@ -4,7 +4,7 @@ rem ===================================================================
 rem  Application server (middle tier). Same as typing, inside backend\:
 rem      uvicorn app.main:app --reload
 rem ===================================================================
-cd /d "%~dp0..\backend"
+cd /d "%~dp0backend"
 if not exist ".venv\Scripts\python.exe" goto noinstall
 
 echo Backend:   http://localhost:8000
