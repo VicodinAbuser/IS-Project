@@ -82,7 +82,7 @@ CREATE TABLE orders (
   customer_id      NUMBER NOT NULL CONSTRAINT fk_orders_customer REFERENCES app_users (user_id),
   outlet_id        NUMBER NOT NULL CONSTRAINT fk_orders_outlet REFERENCES outlets (outlet_id),
   order_status     VARCHAR2(20) DEFAULT 'PENDING_PAYMENT' NOT NULL
-                   CONSTRAINT ck_orders_status CHECK (order_status IN ('PENDING_PAYMENT', 'PAID', 'CANCELLED')),
+                   CONSTRAINT ck_orders_status CHECK (order_status IN ('PENDING_PAYMENT', 'PAID', 'CANCELLED', 'RETURNED')),
   total_amount     NUMBER(12,2) DEFAULT 0 NOT NULL,
   shipping_address VARCHAR2(500) NOT NULL,
   created_at       TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL
@@ -106,7 +106,7 @@ CREATE TABLE payments (
   amount          NUMBER(12,2) NOT NULL,
   payment_method  VARCHAR2(30) CONSTRAINT ck_payments_method CHECK (payment_method IN ('CARD', 'UPI', 'NETBANKING')),
   payment_status  VARCHAR2(20) DEFAULT 'PENDING' NOT NULL
-                  CONSTRAINT ck_payments_status CHECK (payment_status IN ('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED')),
+                  CONSTRAINT ck_payments_status CHECK (payment_status IN ('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED', 'CANCELLED')),
   transaction_ref VARCHAR2(100) CONSTRAINT uq_payments_txn UNIQUE,
   updated_at      TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL
 );
@@ -130,7 +130,7 @@ CREATE TABLE stock_movements (
   outlet_id     NUMBER NOT NULL CONSTRAINT fk_moves_outlet REFERENCES outlets (outlet_id) ON DELETE CASCADE,
   qty_change    NUMBER(10) NOT NULL,          -- +ve = stock in, -ve = stock out
   movement_type VARCHAR2(20) NOT NULL CONSTRAINT ck_moves_type CHECK (movement_type IN
-                ('RESTOCK', 'SALE', 'CANCEL', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'MANUAL')),
+                ('RESTOCK', 'SALE', 'CANCEL', 'RETURN', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'MANUAL')),
   note          VARCHAR2(255),
   order_id      NUMBER CONSTRAINT fk_moves_order REFERENCES orders (order_id) ON DELETE SET NULL,
   user_id       NUMBER CONSTRAINT fk_moves_user REFERENCES app_users (user_id) ON DELETE SET NULL,

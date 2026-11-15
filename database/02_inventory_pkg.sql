@@ -11,20 +11,24 @@
 --   SELECT * FROM stock_movements ORDER BY movement_id DESC FETCH FIRST 5 ROWS ONLY;
 -- =====================================================================
 
-CREATE OR REPLACE PACKAGE inventory_pkg AS
+CREATE OR REPLACE PACKAGE inventory_pkg AUTHID DEFINER AS
   -- Error codes raised to the caller. The Python API turns them into HTTP errors.
   c_not_enough_stock CONSTANT PLS_INTEGER := -20001;   -- -> HTTP 409
   c_not_found        CONSTANT PLS_INTEGER := -20004;   -- -> HTTP 404
   c_invalid_state    CONSTANT PLS_INTEGER := -20009;   -- -> HTTP 409
   c_bad_input        CONSTANT PLS_INTEGER := -20022;   -- -> HTTP 422
 
-  -- Context for the audit trigger: WHY the stock is changing.
-  -- If these are empty (someone ran a plain UPDATE), the trigger logs it as MANUAL.
-  g_movement_type VARCHAR2(20);
-  g_user_id       NUMBER;
-  g_order_id      NUMBER;
-  g_note          VARCHAR2(255);
-  g_when          TIMESTAMP;      -- only used by the seed script to back-date history
+  -- Unpaid orders older than this are cancelled automatically and their stock released.
+  c_payment_timeout_minutes CONSTANT PLS_INTEGER := 30;
+
+  -- Read by the audit trigger: WHY the stock is changing. They return NULL when someone
+  -- ran a plain UPDATE, and the trigger then logs the change as MANUAL.
+  FUNCTION ctx_movement_type RETURN VARCHAR2;
+  FUNCTION ctx_user_id       RETURN NUMBER;
+  FUNCTION ctx_order_id      RETURN NUMBER;
+  FUNCTION ctx_note          RETURN VARCHAR2;
+  FUNCTION ctx_when          RETURN TIMESTAMP;
+  PROCEDURE set_backdate(p_when IN TIMESTAMP);   -- only used by the seed script to back-date history
 
   -- ----- Stock management (admin) -----
   PROCEDURE restock       (p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity IN NUMBER,
@@ -43,6 +47,10 @@ CREATE OR REPLACE PACKAGE inventory_pkg AS
   PROCEDURE cancel_order   (p_order_id IN NUMBER, p_user_id IN NUMBER DEFAULT NULL);
   PROCEDURE update_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2,
                             p_courier IN VARCHAR2 DEFAULT NULL, p_tracking_number IN VARCHAR2 DEFAULT NULL);
+  -- Cancels PENDING_PAYMENT orders older than p_older_than_minutes and returns their stock.
+  -- Called automatically at the start of every PLACE_ORDER. p_expired = how many were cancelled.
+  PROCEDURE expire_unpaid_orders(p_older_than_minutes IN NUMBER DEFAULT c_payment_timeout_minutes,
+                                 p_expired OUT NUMBER);
 
   -- ----- Helpers -----
   FUNCTION stock_at   (p_product_id IN NUMBER, p_outlet_id IN NUMBER) RETURN NUMBER;
@@ -56,6 +64,20 @@ END inventory_pkg;
 /
 
 CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
+
+  -- Private: only this package can set them; the trigger reads them through the ctx_* functions.
+  g_movement_type VARCHAR2(20);
+  g_user_id       NUMBER;
+  g_order_id      NUMBER;
+  g_note          VARCHAR2(255);
+  g_when          TIMESTAMP;
+
+  FUNCTION ctx_movement_type RETURN VARCHAR2  IS BEGIN RETURN g_movement_type; END;
+  FUNCTION ctx_user_id       RETURN NUMBER    IS BEGIN RETURN g_user_id;       END;
+  FUNCTION ctx_order_id      RETURN NUMBER    IS BEGIN RETURN g_order_id;      END;
+  FUNCTION ctx_note          RETURN VARCHAR2  IS BEGIN RETURN g_note;          END;
+  FUNCTION ctx_when          RETURN TIMESTAMP IS BEGIN RETURN g_when;          END;
+  PROCEDURE set_backdate(p_when IN TIMESTAMP) IS BEGIN g_when := p_when;       END;
 
   PROCEDURE clear_context IS
   BEGIN
@@ -126,6 +148,27 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
     WHEN OTHERS THEN clear_context; RAISE;
   END change_stock;
 
+  -- Put every item of an order back on its outlet's shelf (no commit).
+  PROCEDURE return_items_to_stock(p_order_id IN NUMBER, p_outlet_id IN NUMBER, p_movement_type IN VARCHAR2,
+                                  p_user_id IN NUMBER, p_note IN VARCHAR2) IS
+  BEGIN
+    FOR item IN (SELECT product_id, quantity FROM order_items WHERE order_id = p_order_id ORDER BY product_id) LOOP
+      change_stock(item.product_id, p_outlet_id, item.quantity, p_movement_type, p_user_id, p_order_id, p_note);
+    END LOOP;
+  END return_items_to_stock;
+
+  -- Cancel one order that hasn't shipped (no commit). Used by cancel_order and expire_unpaid_orders.
+  PROCEDURE do_cancel(p_order_id IN NUMBER, p_outlet_id IN NUMBER, p_user_id IN NUMBER, p_note IN VARCHAR2) IS
+  BEGIN
+    return_items_to_stock(p_order_id, p_outlet_id, 'CANCEL', p_user_id, p_note);
+    -- Paid -> the money goes back (REFUNDED); never paid -> the open payment is closed (CANCELLED).
+    UPDATE payments
+       SET payment_status = CASE payment_status WHEN 'SUCCESS' THEN 'REFUNDED' ELSE 'CANCELLED' END,
+           updated_at = SYSTIMESTAMP
+     WHERE order_id = p_order_id AND payment_status IN ('SUCCESS', 'PENDING', 'FAILED');
+    UPDATE orders SET order_status = 'CANCELLED' WHERE order_id = p_order_id;
+  END do_cancel;
+
   PROCEDURE restock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity IN NUMBER,
                     p_note IN VARCHAR2 DEFAULT NULL, p_user_id IN NUMBER DEFAULT NULL) IS
   BEGIN
@@ -175,10 +218,13 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
                         p_items_json IN CLOB, p_order_id OUT NUMBER) IS
     v_price  products.price%TYPE;
     v_active products.is_active%TYPE;
-    v_total  NUMBER := 0;
-    v_lines  PLS_INTEGER := 0;
+    v_total   NUMBER := 0;
+    v_lines   PLS_INTEGER := 0;
+    v_expired NUMBER;
   BEGIN
     assert_exists('OUTLET', p_outlet_id);
+    -- First release stock held by abandoned checkouts, then check availability.
+    expire_unpaid_orders(c_payment_timeout_minutes, v_expired);
     IF LENGTH(TRIM(p_shipping_address)) IS NULL OR LENGTH(TRIM(p_shipping_address)) < 5 THEN
       RAISE_APPLICATION_ERROR(c_bad_input, 'Shipping address is too short');
     END IF;
@@ -281,15 +327,7 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
       RAISE_APPLICATION_ERROR(c_invalid_state, 'Order already shipped, cannot cancel');
     END IF;
 
-    -- Put every item back on the outlet's shelf.
-    FOR item IN (SELECT product_id, quantity FROM order_items WHERE order_id = p_order_id ORDER BY product_id) LOOP
-      change_stock(item.product_id, v_outlet, item.quantity, 'CANCEL', p_user_id, p_order_id,
-                   'Order #' || p_order_id || ' cancelled');
-    END LOOP;
-
-    UPDATE payments SET payment_status = 'REFUNDED', updated_at = SYSTIMESTAMP
-     WHERE order_id = p_order_id AND payment_status = 'SUCCESS';
-    UPDATE orders SET order_status = 'CANCELLED' WHERE order_id = p_order_id;
+    do_cancel(p_order_id, v_outlet, p_user_id, 'Order #' || p_order_id || ' cancelled');
     COMMIT;
   EXCEPTION
     WHEN OTHERS THEN ROLLBACK; RAISE;
@@ -297,26 +335,73 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
 
   PROCEDURE update_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2,
                             p_courier IN VARCHAR2 DEFAULT NULL, p_tracking_number IN VARCHAR2 DEFAULT NULL) IS
-    v_status orders.order_status%TYPE;
+    v_status  orders.order_status%TYPE;
+    v_outlet  orders.outlet_id%TYPE;
+    v_current deliveries.delivery_status%TYPE;
+
+    -- Position in the delivery journey; a delivery may only move forward.
+    FUNCTION step(p IN VARCHAR2) RETURN PLS_INTEGER IS
+    BEGIN
+      RETURN CASE p WHEN 'NOT_SHIPPED' THEN 0 WHEN 'PACKED' THEN 1 WHEN 'SHIPPED' THEN 2
+                    WHEN 'OUT_FOR_DELIVERY' THEN 3 WHEN 'DELIVERED' THEN 4 WHEN 'RETURNED' THEN 5 END;
+    END step;
   BEGIN
     BEGIN
-      SELECT order_status INTO v_status FROM orders WHERE order_id = p_order_id FOR UPDATE;
+      SELECT o.order_status, o.outlet_id, d.delivery_status INTO v_status, v_outlet, v_current
+        FROM orders o JOIN deliveries d ON d.order_id = o.order_id
+       WHERE o.order_id = p_order_id
+         FOR UPDATE OF o.order_status;
     EXCEPTION
       WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Order not found');
     END;
     IF v_status <> 'PAID' THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Only paid orders can be shipped');
+      RAISE_APPLICATION_ERROR(c_invalid_state, 'Only paid orders can be shipped (this order is ' || v_status || ')');
     END IF;
+    IF step(p_status) IS NULL THEN
+      RAISE_APPLICATION_ERROR(c_bad_input, 'Unknown delivery status ' || p_status);
+    END IF;
+    IF step(p_status) < step(v_current) THEN
+      RAISE_APPLICATION_ERROR(c_invalid_state, 'Delivery cannot go back from ' || v_current || ' to ' || p_status);
+    END IF;
+    IF p_status = 'RETURNED' AND v_current NOT IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED') THEN
+      RAISE_APPLICATION_ERROR(c_invalid_state, 'Only shipped orders can be returned; cancel it instead');
+    END IF;
+
     UPDATE deliveries
        SET delivery_status = p_status,
            courier         = NVL(p_courier, courier),
            tracking_number = NVL(p_tracking_number, tracking_number),
            updated_at      = SYSTIMESTAMP
      WHERE order_id = p_order_id;
+
+    IF p_status = 'RETURNED' THEN
+      -- Goods came back: restock them at the outlet and refund the customer.
+      return_items_to_stock(p_order_id, v_outlet, 'RETURN', NULL, 'Order #' || p_order_id || ' returned');
+      UPDATE payments SET payment_status = 'REFUNDED', updated_at = SYSTIMESTAMP
+       WHERE order_id = p_order_id AND payment_status = 'SUCCESS';
+      UPDATE orders SET order_status = 'RETURNED' WHERE order_id = p_order_id;
+    END IF;
     COMMIT;
   EXCEPTION
     WHEN OTHERS THEN ROLLBACK; RAISE;
   END update_delivery;
+
+  PROCEDURE expire_unpaid_orders(p_older_than_minutes IN NUMBER DEFAULT c_payment_timeout_minutes,
+                                 p_expired OUT NUMBER) IS
+  BEGIN
+    p_expired := 0;
+    FOR o IN (SELECT order_id, outlet_id FROM orders
+               WHERE order_status = 'PENDING_PAYMENT'
+                 AND created_at < CAST(SYSTIMESTAMP AS TIMESTAMP)   -- same type as the column, so the index is usable
+                                  - NUMTODSINTERVAL(p_older_than_minutes, 'MINUTE')
+               ORDER BY order_id
+                 FOR UPDATE SKIP LOCKED) LOOP     -- skip an order someone is paying for right now
+      do_cancel(o.order_id, o.outlet_id, NULL,
+                'Order #' || o.order_id || ' not paid within ' || p_older_than_minutes || ' minutes');
+      p_expired := p_expired + 1;
+    END LOOP;
+    -- No COMMIT here: the caller (e.g. PLACE_ORDER) commits it with its own work.
+  END expire_unpaid_orders;
 
 END inventory_pkg;
 /
@@ -332,12 +417,12 @@ BEGIN
   IF v_change <> 0 THEN
     INSERT INTO stock_movements (product_id, outlet_id, qty_change, movement_type, note, order_id, user_id, created_at)
     VALUES (:NEW.product_id, :NEW.outlet_id, v_change,
-            NVL(inventory_pkg.g_movement_type, 'MANUAL'),
-            CASE WHEN inventory_pkg.g_movement_type IS NULL
+            NVL(inventory_pkg.ctx_movement_type, 'MANUAL'),
+            CASE WHEN inventory_pkg.ctx_movement_type IS NULL
                  THEN 'Changed directly in the database by ' || USER
-                 ELSE inventory_pkg.g_note END,
-            inventory_pkg.g_order_id, inventory_pkg.g_user_id,
-            NVL(inventory_pkg.g_when, SYSTIMESTAMP));
+                 ELSE inventory_pkg.ctx_note END,
+            inventory_pkg.ctx_order_id, inventory_pkg.ctx_user_id,
+            NVL(inventory_pkg.ctx_when, SYSTIMESTAMP));
   END IF;
 END;
 /

@@ -156,10 +156,11 @@ Design decisions worth explaining:
 | `restock(product, outlet, qty, note, user)` | New stock arrives | `POST /api/inventory/restock` |
 | `adjust_stock(product, outlet, change, note, user)` | Damage or audit correction (+/−) | `POST /api/inventory/adjust` |
 | `transfer_stock(product, from, to, qty, note, user)` | Moves stock between outlets in one transaction | `POST /api/inventory/transfer` |
-| `place_order(customer, outlet, address, items_json, OUT order_id)` | Checks and reserves stock, creates order, items, payment and delivery rows. All or nothing. | `POST /api/orders` |
+| `place_order(customer, outlet, address, items_json, OUT order_id)` | First expires abandoned checkouts, then checks and reserves stock, and creates order, items, payment and delivery rows. All or nothing. | `POST /api/orders` |
 | `record_payment(order, method, success, txn_ref)` | Saves the gateway result. On success: PAID and PACKED. | `POST /api/orders/{id}/pay` |
-| `cancel_order(order, user)` | Returns stock and refunds the payment (before shipping only) | `POST /api/orders/{id}/cancel` |
-| `update_delivery(order, status, courier, tracking)` | Delivery tracking (paid orders only) | `PATCH /api/orders/{id}/delivery` |
+| `cancel_order(order, user)` | Before shipping only: returns stock. Payment becomes REFUNDED if paid, CANCELLED if not. | `POST /api/orders/{id}/cancel` |
+| `update_delivery(order, status, courier, tracking)` | Delivery tracking (paid orders only). Status can only move **forward**. **RETURNED** (after shipping) restocks the items and refunds. | `PATCH /api/orders/{id}/delivery` |
+| `expire_unpaid_orders(minutes, OUT count)` | Cancels orders left unpaid for 30+ minutes, so abandoned checkouts don't hold stock | called by `place_order` |
 | `stock_at(product, outlet)` / `total_stock(product)` | Functions used inside the product `SELECT` | `GET /api/products` |
 | `change_stock(...)` | Core rule used by all of the above: locks the row, checks stock, updates it | (internal) |
 
@@ -255,6 +256,12 @@ It uses standalone Angular components. Each page has a `.ts` class (state held i
 **How do you prevent overselling?**
 `INVENTORY_PKG.PLACE_ORDER` runs as **one transaction**. For each item, `change_stock` locks the stock row with `SELECT … FOR UPDATE`, so two people buying at the same moment can't both take the last unit. If any item is short, Oracle raises `ORA-20001` and the procedure runs `ROLLBACK`, so nothing is saved (all or nothing). Items are processed in product-ID order to avoid deadlocks. The `CHECK (quantity >= 0)` constraint is a final safety net.
 
+**What are the order rules?**
+- **Order:** `PENDING_PAYMENT` → `PAID` → (`CANCELLED` before shipping, or `RETURNED` after shipping).
+- **Delivery:** `PACKED` → `SHIPPED` → `OUT_FOR_DELIVERY` → `DELIVERED`, and it can only move forward. Otherwise a delivered order could be moved back and cancelled for a refund.
+- **Abandoned checkouts:** unpaid orders are cancelled automatically after 30 minutes so their stock goes back on sale.
+- These rules live in `INVENTORY_PKG`, so they also apply in SQL Developer.
+
 **What does the trigger do?**
 `TRG_INVENTORY_AUDIT` fires `AFTER INSERT OR UPDATE OF quantity ON inventory FOR EACH ROW` and writes the change to `STOCK_MOVEMENTS`. The procedures first fill package variables (movement type, user, order, note) so the trigger knows *why* the stock changed. If someone runs a plain `UPDATE`, those variables are empty and the change is logged as `MANUAL`, along with the database user's name.
 
@@ -264,7 +271,8 @@ It uses standalone Angular components. Each page has a `.ts` class (state held i
 |---|---|---|
 | New stock arrives | + | RESTOCK |
 | Customer orders | − | SALE |
-| Order cancelled | + | CANCEL |
+| Order cancelled, or unpaid for 30 minutes | + | CANCEL |
+| Shipped order returned | + | RETURN |
 | Damage or audit | ± | ADJUSTMENT |
 | Moved between outlets | − / + | TRANSFER_OUT / TRANSFER_IN |
 
@@ -286,7 +294,7 @@ It needs far less code, validates data automatically, generates Swagger docs at 
 2. **Requirements**: the feature lists above (functional); security, speed and auditability (non-functional)
 3. **Design**: 3-tier architecture, ER diagram, REST API contract, UI screens
 4. **Development**: database first (tables → PL/SQL package → views), then API routers, then Angular pages
-5. **Testing**: pytest API tests on real Oracle, Angular unit tests, SQL demo script, manual end-to-end demo
+5. **Testing**: pytest API tests on real Oracle (including 8 simultaneous buyers, access control, returns, abandoned checkouts), Angular unit tests, SQL demo script, end-to-end browser test
 6. **Deployment and maintenance**: production checklist above
 
 Screenshots of every page are in `docs/screenshots/`.

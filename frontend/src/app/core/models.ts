@@ -1,7 +1,7 @@
 // TypeScript interfaces mirroring the backend's JSON (Pydantic schemas).
 export type Role = 'ADMIN' | 'CUSTOMER';
-export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'RETURNED';
+export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
 export type DeliveryStatus = 'NOT_SHIPPED' | 'PACKED' | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'RETURNED';
 
 export interface User { id: number; name: string; email: string; role: Role; phone?: string; address?: string; }

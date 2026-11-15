@@ -3,7 +3,7 @@
 <div class="card form-row">
   <div><label for="st">Order status</label>
     <select id="st" [(ngModel)]="filter.status" (ngModelChange)="load()"><option value="">All</option>
-      <option value="PENDING_PAYMENT">Pending payment</option><option value="PAID">Paid</option><option value="CANCELLED">Cancelled</option></select></div>
+      <option value="PENDING_PAYMENT">Pending payment</option><option value="PAID">Paid</option><option value="CANCELLED">Cancelled</option><option value="RETURNED">Returned</option></select></div>
   <div><label for="ds">Delivery status</label>
     <select id="ds" [(ngModel)]="filter.delivery_status" (ngModelChange)="load()"><option value="">All</option>
       @for (d of deliveryStatuses; track d) { <option [value]="d">{{ label(d) }}</option> }</select></div>

@@ -15,6 +15,7 @@ class OrderStatus(str, enum.Enum):
     PENDING_PAYMENT = "PENDING_PAYMENT"
     PAID = "PAID"
     CANCELLED = "CANCELLED"
+    RETURNED = "RETURNED"      # shipped, then sent back: stock returned, payment refunded
 
 
 class PaymentStatus(str, enum.Enum):
@@ -22,6 +23,7 @@ class PaymentStatus(str, enum.Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     REFUNDED = "REFUNDED"
+    CANCELLED = "CANCELLED"    # order cancelled (or expired) before it was paid
 
 
 class DeliveryStatus(str, enum.Enum):
@@ -37,6 +39,7 @@ class MovementType(str, enum.Enum):
     RESTOCK = "RESTOCK"
     SALE = "SALE"
     CANCEL = "CANCEL"
+    RETURN = "RETURN"
     ADJUSTMENT = "ADJUSTMENT"
     TRANSFER_IN = "TRANSFER_IN"
     TRANSFER_OUT = "TRANSFER_OUT"

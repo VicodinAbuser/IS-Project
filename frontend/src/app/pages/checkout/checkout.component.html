@@ -7,8 +7,8 @@
       <p>Your order is being packed at <strong>{{ o.outlet.name }}</strong>.</p>
       <a class="btn" routerLink="/orders">Track my orders</a>
     </div>
-  } @else if (o.status === 'CANCELLED') {
-    <div class="card empty">Order #{{ o.id }} was cancelled. <a routerLink="/shop">Back to shop</a></div>
+  } @else if (o.status === 'CANCELLED' || o.status === 'RETURNED') {
+    <div class="card empty">Order #{{ o.id }} was {{ o.status === 'CANCELLED' ? 'cancelled (unpaid orders are cancelled after 30 minutes)' : 'returned' }}. <a routerLink="/shop">Back to shop</a></div>
   } @else {
     <div class="layout">
       <div class="card">

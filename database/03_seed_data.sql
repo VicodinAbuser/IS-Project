@@ -98,7 +98,7 @@ BEGIN
   SELECT user_id INTO v_admin FROM app_users WHERE email = 'admin@inventory.com';
   v_span := (SYSDATE - CAST(v_start AS DATE)) * 86400;   -- seconds between start and now
 
-  inventory_pkg.g_when := v_start;
+  inventory_pkg.set_backdate(v_start);
   FOR p IN (SELECT product_id FROM products ORDER BY product_id) LOOP
     FOR o IN (SELECT outlet_id FROM outlets ORDER BY outlet_id) LOOP
       inventory_pkg.change_stock(p.product_id, o.outlet_id, TRUNC(DBMS_RANDOM.VALUE(60, 161)),
@@ -108,7 +108,7 @@ BEGIN
 
   FOR n IN 1 .. 260 LOOP
     v_when := v_start + NUMTODSINTERVAL(DBMS_RANDOM.VALUE(0, v_span), 'SECOND');
-    inventory_pkg.g_when := v_when;
+    inventory_pkg.set_backdate(v_when);
     SELECT user_id, address INTO v_customer, v_address FROM (
       SELECT user_id, address FROM app_users WHERE user_role = 'CUSTOMER' ORDER BY DBMS_RANDOM.VALUE
     ) FETCH FIRST 1 ROW ONLY;
@@ -147,7 +147,7 @@ BEGIN
   END LOOP;
 
   -- A few items low on stock, so the low-stock alert shows in the demo.
-  inventory_pkg.g_when := NULL;
+  inventory_pkg.set_backdate(NULL);
   FOR r IN (SELECT i.product_id, i.outlet_id, i.quantity FROM inventory i
               JOIN products p ON p.product_id = i.product_id
               JOIN outlets o ON o.outlet_id = i.outlet_id
