@@ -1,6 +1,6 @@
 # Option A: run everything on your laptop ({{ORACLE}})
 
-> This folder is set up for **{{ORACLE}}** (service name **`{{SERVICE}}`**). Using {{OTHER}} instead? Download **[{{OTHER_FOLDER}}.zip](https://github.com/VicodinAbuser/IS-Project/raw/main/{{OTHER_FOLDER}}.zip)**.
+> This folder is set up for **{{ORACLE}}** (service name **`{{SERVICE}}`**). Using {{OTHER}} instead? Use the **[{{OTHER_FOLDER}}](../{{OTHER_FOLDER}}/README.md)** folder next to this one.
 
 In this option **your laptop is the server** for all three tiers. Nothing is hosted online, and nothing needs internet once it's installed. It's the most reliable setup for a classroom demo.
 
@@ -30,7 +30,7 @@ So the command means: *start the application server and run the FastAPI app defi
 **This folder is complete on its own.** It contains all the code needed to run the app:
 
 ```
-{{FOLDER}}/
+run-local/{{FOLDER}}/
 ├── START-APP.bat, 1-install.bat, 2-setup-database.bat …   double-click scripts
 ├── README.md            this guide
 ├── ORACLE_SETUP.md      detailed Oracle + SQL Developer help
@@ -54,17 +54,15 @@ So the command means: *start the application server and run the FastAPI app defi
 
 You **don't** need to set any environment variables.
 
-### Step 2: Download this folder
-Download **{{FOLDER}}.zip** directly:
-https://github.com/VicodinAbuser/IS-Project/raw/main/{{FOLDER}}.zip
-
-Right-click the zip → **Extract All…**, to for example `C:\IS-Project`. You get a `{{FOLDER}}` folder; everything below happens inside it.
+### Step 2: Get the code
+Clone the repository (`git clone https://github.com/VicodinAbuser/IS-Project.git`), or on GitHub click **Code → Download ZIP** and extract it, to for example `C:\IS-Project`.
+Then open the folder **`run-local\{{FOLDER}}`**. Everything below happens inside it.
 *(Keep the folder structure as it is. The scripts look for `backend`, `frontend` and `database` next to them.)*
 
-### Step 3: Double-click `{{FOLDER}}\1-install.bat`
+### Step 3: Double-click `run-local\{{FOLDER}}\1-install.bat`
 This installs the Python packages (backend) and Node packages (website). It takes about 3–10 minutes. It should end with **"Install finished"**.
 
-### Step 4: Double-click `{{FOLDER}}\2-setup-database.bat`
+### Step 4: Double-click `run-local\{{FOLDER}}\2-setup-database.bat`
 It asks three things:
 ```
 Service name [{{SERVICE}}]:{{PAD}}← press Enter ({{SERVICE}} is right for {{ORACLE_SHORT}}; type your own name only if you chose a different one)
@@ -86,7 +84,7 @@ Expand it to see **Tables**, **Views**, **Packages** and **Triggers**.
 
 ## Every time you use the app
 
-**Double-click `{{FOLDER}}\START-APP.bat`**
+**Double-click `run-local\{{FOLDER}}\START-APP.bat`**
 
 It opens two windows, **Backend** and **Website**, and then the browser at **http://localhost:4200** after about 30 seconds.
 
@@ -97,7 +95,7 @@ It opens two windows, **Backend** and **Website**, and then the browser at **htt
 Oracle starts automatically with Windows, so you don't need to start it yourself.
 
 ### The same thing by hand (if you prefer typing commands)
-Open **Command Prompt** in the `{{FOLDER}}` folder.
+Open **Command Prompt** in the `run-local\{{FOLDER}}` folder.
 
 Window 1, the backend:
 ```bat

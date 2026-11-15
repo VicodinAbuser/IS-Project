@@ -1,7 +1,9 @@
-"""Build the two self-contained laptop folders and their zips from the main code:
+"""Build the two self-contained laptop folders inside run-local/ from the main code:
 
-    run-local-oracle21c/   + run-local-oracle21c.zip    (Oracle Database 21c, service ORCLPDB)
-    run-local-oracle26ai/  + run-local-oracle26ai.zip   (Oracle AI Database 26ai Free, service FREEPDB1)
+    run-local/oracle21c/    Oracle Database 21c          (service ORCLPDB)
+    run-local/oracle26ai/   Oracle AI Database 26ai Free (service FREEPDB1)
+
+Each has its own database/, backend/ and frontend/ code, scripts and instructions.
 
 The code is edited in backend/, frontend/ and database/; the double-click scripts and
 README are templates in tools/run_local_template/. Run this after any change:
@@ -11,10 +13,10 @@ and in the instructions, which describe just that one Oracle version.
 """
 import re
 import shutil
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+OUT_DIR = ROOT / "run-local"
 TEMPLATE = ROOT / "tools" / "run_local_template"
 DEFAULT_DSN = "localhost:1521/FREEPDB1"
 
@@ -29,7 +31,7 @@ ORA01109_ROW = ("| `ORA-01109: database not open` | See [ORACLE_SETUP.md](ORACLE
                 "Part A, step 6 (`ALTER PLUGGABLE DATABASE ALL OPEN; ... SAVE STATE;`) |\n")
 
 VARIANTS = {
-    "run-local-oracle21c": {
+    "oracle21c": {
         "ORACLE": "Oracle Database 21c",
         "ORACLE_SHORT": "Oracle 21c",
         "ORACLE_BOX": "Oracle Database 21c ",
@@ -39,7 +41,7 @@ VARIANTS = {
         "SQLDEV": "Usually included with 21c: `sqldeveloper\\sqldeveloper.exe` inside your Oracle folder. If it's missing, d",
         "ORA01109_ROW": ORA01109_ROW,
         "OTHER": "Oracle 26ai Free",
-        "OTHER_FOLDER": "run-local-oracle26ai",
+        "OTHER_FOLDER": "oracle26ai",
         "keep_option": 2,
         "guide_lines": {
             "Service name [FREEPDB1]:     ← press Enter for 26ai, or type ORCLPDB for 21c":
@@ -53,7 +55,7 @@ VARIANTS = {
         # the default service is already ORCLPDB in this folder, so no .env step is needed
         "drop_lines": ["5. **21c only:** create"],
     },
-    "run-local-oracle26ai": {
+    "oracle26ai": {
         "ORACLE": "Oracle AI Database 26ai Free",
         "ORACLE_SHORT": "Oracle 26ai Free",
         "ORACLE_BOX": "Oracle 26ai Free    ",
@@ -63,7 +65,7 @@ VARIANTS = {
         "SQLDEV": "D",
         "ORA01109_ROW": "",
         "OTHER": "Oracle 21c",
-        "OTHER_FOLDER": "run-local-oracle21c",
+        "OTHER_FOLDER": "oracle21c",
         "keep_option": 1,
         "guide_lines": {
             "Service name [FREEPDB1]:     ← press Enter for 26ai, or type ORCLPDB for 21c":
@@ -100,8 +102,8 @@ def oracle_guide(v: dict) -> str:
     end = text.index("> **You don't need to set")
     text = (text[:start] + f"This folder is for **{v['ORACLE']}**. You'll use host `localhost`, port `1521`, "
             f"service name **`{v['SERVICE']}`**.\n\n" + text[end:])
-    text = must_replace(text, "then follow the README in [run-local-oracle21c](../run-local-oracle21c/README.md) or "
-                        "[run-local-oracle26ai](../run-local-oracle26ai/README.md)",
+    text = must_replace(text, "then follow the README in [run-local/oracle21c](../run-local/oracle21c/README.md) or "
+                        "[run-local/oracle26ai](../run-local/oracle26ai/README.md)",
                         "then follow [README.md](README.md)", "guide")
     # Part A: keep only this version's install option
     start = text.index("### Option 1:")
@@ -121,7 +123,7 @@ def oracle_guide(v: dict) -> str:
 
 
 def build(folder: str, v: dict) -> None:
-    out = ROOT / folder
+    out = OUT_DIR / folder
     v = {**v, "FOLDER": folder}
     if out.exists():
         shutil.rmtree(out)
@@ -143,17 +145,40 @@ def build(folder: str, v: dict) -> None:
             (out / src.name).write_text(fill(src.read_text(encoding="utf-8"), v), encoding="utf-8")
     (out / "ORACLE_SETUP.md").write_text(oracle_guide(v), encoding="utf-8")
 
-    zip_path = ROOT / f"{folder}.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(out.rglob("*")):
-            if path.is_file():
-                zf.write(path, Path(folder) / path.relative_to(out))
-    print(f"built {folder}/ and {zip_path.name} ({zip_path.stat().st_size // 1024} KB)")
-
+    print(f"built run-local/{folder}/")
 
 def main() -> None:
+    if OUT_DIR.exists():
+        shutil.rmtree(OUT_DIR)
+    OUT_DIR.mkdir()
     for folder, v in VARIANTS.items():
         build(folder, v)
+    (OUT_DIR / "README.md").write_text(INDEX, encoding="utf-8")
+
+
+INDEX = """# run-local: run everything on your laptop
+
+Pick the folder for the Oracle version installed on your laptop. Each folder is complete on its own:
+its own `database/` (Oracle SQL), `backend/` (Python FastAPI), `frontend/` (Angular), double-click
+scripts and step-by-step instructions.
+
+| Your Oracle | Folder | Service name |
+|---|---|---|
+| **Oracle Database 21c** (`WINDOWS.X64_213000_db_home.zip`) | [oracle21c/](oracle21c/README.md) | `ORCLPDB` |
+| **Oracle AI Database 26ai Free** | [oracle26ai/](oracle26ai/README.md) | `FREEPDB1` |
+
+```
+run-local/
+├── oracle21c/     database/  backend/  frontend/  *.bat  README.md  ORACLE_SETUP.md
+└── oracle26ai/    database/  backend/  frontend/  *.bat  README.md  ORACLE_SETUP.md
+```
+
+Use only one folder. Both create the same `INVENTORY` user and tables, so if you ever install both
+Oracle versions, each folder talks only to its own database.
+
+*For developers:* these folders are generated. Edit the code in the top-level `backend/`, `frontend/`
+and `database/` folders, then run `python tools/build_run_local.py`.
+"""
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ The project works with **either** of these. Both were tested.
 
 > **SQL Developer is Oracle's tool.** MySQL Workbench cannot open an Oracle database.
 
-> Prefer double-click scripts? Install Oracle (Part A), then follow the README in [run-local-oracle21c](../run-local-oracle21c/README.md) or [run-local-oracle26ai](../run-local-oracle26ai/README.md); it automates Parts B–D.
+> Prefer double-click scripts? Install Oracle (Part A), then follow the README in [run-local/oracle21c](../run-local/oracle21c/README.md) or [run-local/oracle26ai](../run-local/oracle26ai/README.md); it automates Parts B–D.
 
 ## What you need
 - Windows 10/11 (64-bit), at least 8 GB RAM, 10–15 GB free disk
