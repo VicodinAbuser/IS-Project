@@ -1,25 +1,34 @@
-"""API tests. Run: pytest -q"""
+"""API tests against a real Oracle database.
+
+They use a SEPARATE schema (default INVENTORY_TEST, created by database/00_create_user.sql)
+and rebuild it before each test, so your demo data in INVENTORY is never touched.
+Run: pytest -q
+"""
 import os
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_inventory.db"
+os.environ["ORACLE_USER"] = os.getenv("TEST_ORACLE_USER", "inventory_test")
+os.environ["ORACLE_PASSWORD"] = os.getenv("TEST_ORACLE_PASSWORD", "inventory123")
 
+import oracledb
 import pytest
 from fastapi.testclient import TestClient
 
-from app.database import Base, SessionLocal, engine
+from app.config import settings
 from app.main import app
-from app.models import Role, User
 from app.security import hash_password
+from setup_db import SQL_DIR, run_file
 
 
 @pytest.fixture()
 def client():
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-    db = SessionLocal()
-    db.add(User(name="Admin", email="admin@test.com", password_hash=hash_password("admin123"), role=Role.ADMIN))
-    db.commit()
-    db.close()
+    conn = oracledb.connect(user=settings.oracle_user, password=settings.oracle_password, dsn=settings.oracle_dsn)
+    for name in ("01_schema.sql", "02_inventory_pkg.sql"):
+        run_file(conn, SQL_DIR / name)
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO app_users (full_name, email, password_hash, user_role)
+                       VALUES ('Admin', 'admin@test.com', :h, 'ADMIN')""", {"h": hash_password("admin123")})
+    conn.commit()
+    conn.close()
     with TestClient(app) as c:
         yield c
 
@@ -77,6 +86,8 @@ def test_full_purchase_flow(client):
     assert r.status_code == 402
     r = client.post(f"/api/orders/{order['id']}/pay", json={"method": "UPI", "upi_id": "cust@okbank"}, headers=cust)
     assert r.status_code == 200 and r.json()["status"] == "PAID"
+    mine = client.get("/api/orders/my", headers=cust).json()
+    assert [o["id"] for o in mine] == [order["id"]] and mine[0]["items"][0]["quantity"] == 8
     assert r.json()["payment"]["transaction_ref"].startswith("TXN-")
 
     r = client.patch(f"/api/orders/{order['id']}/delivery", json={"status": "SHIPPED", "courier": "BlueDart",
@@ -113,3 +124,41 @@ def test_transfer(client):
     r = client.post("/api/inventory/transfer", json={"product_id": product["id"], "from_outlet_id": outlet["id"],
                                                      "to_outlet_id": o2["id"], "quantity": 3}, headers=admin)
     assert r.json() == {"from_quantity": 7, "to_quantity": 3}
+
+
+def test_oracle_trigger_logs_direct_sql_changes(client):
+    """A plain UPDATE typed in SQL Developer is still recorded by TRG_INVENTORY_AUDIT."""
+    admin = auth(client, "admin@test.com", "admin123")
+    outlet, product = setup_catalog(client, admin)
+    conn = oracledb.connect(user=settings.oracle_user, password=settings.oracle_password, dsn=settings.oracle_dsn)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE inventory SET quantity = quantity - 1 WHERE product_id = :p", {"p": product["id"]})
+    conn.commit()
+    conn.close()
+    latest = client.get("/api/inventory/movements", headers=admin).json()[0]
+    assert latest["movement_type"] == "MANUAL" and latest["change"] == -1
+
+
+def test_plsql_errors_become_http_errors(client):
+    admin = auth(client, "admin@test.com", "admin123")
+    outlet, product = setup_catalog(client, admin)
+    same = client.post("/api/inventory/transfer", json={"product_id": product["id"], "from_outlet_id": outlet["id"],
+                                                        "to_outlet_id": outlet["id"], "quantity": 1}, headers=admin)
+    assert same.status_code == 422 and same.json()["detail"] == "Choose two different outlets"
+    missing = client.post("/api/inventory/restock", json={"product_id": 9999, "outlet_id": outlet["id"],
+                                                          "quantity": 1}, headers=admin)
+    assert missing.status_code == 404
+    dup = client.post("/api/products", json={"sku": "T-1", "name": "Duplicate", "price": 1}, headers=admin)
+    assert dup.status_code == 409
+
+
+def test_survives_package_recompile(client):
+    """Re-running 02_inventory_pkg.sql while the API is running must not break requests."""
+    admin = auth(client, "admin@test.com", "admin123")
+    outlet, product = setup_catalog(client, admin)          # API sessions now hold package state
+    conn = oracledb.connect(user=settings.oracle_user, password=settings.oracle_password, dsn=settings.oracle_dsn)
+    run_file(conn, SQL_DIR / "02_inventory_pkg.sql")
+    conn.close()
+    r = client.post("/api/inventory/restock", json={"product_id": product["id"], "outlet_id": outlet["id"],
+                                                    "quantity": 5}, headers=admin)
+    assert r.status_code == 200 and r.json()["quantity"] == 15

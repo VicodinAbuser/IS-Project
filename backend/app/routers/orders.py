@@ -1,146 +1,130 @@
-"""Orders, payments (demo gateway) and delivery tracking."""
-import uuid
+"""Orders, payments (demo gateway) and delivery tracking. The work is done by INVENTORY_PKG procedures."""
+import json
 
+import oracledb
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
 
-from ..database import get_db
-from ..inventory_service import change_stock
-from ..models import (Delivery, DeliveryStatus, MovementType, Order, OrderItem, OrderStatus, Outlet,
-                      Payment, PaymentStatus, Product, Role, User)
-from ..schemas import DeliveryUpdateIn, OrderIn, OrderOut, PaymentIn
+from ..database import call_procedure, get_db, query
+from ..schemas import DeliveryStatus, DeliveryUpdateIn, OrderIn, OrderOut, OrderStatus, PaymentIn
 from ..security import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/orders", tags=["Orders, payments & delivery"])
 
-LOAD = (selectinload(Order.items).selectinload(OrderItem.product), selectinload(Order.outlet),
-        selectinload(Order.customer), selectinload(Order.payment), selectinload(Order.delivery))
+ORDER_SELECT = """
+    SELECT o.order_id, o.order_status, o.total_amount, o.shipping_address, o.created_at,
+           ou.outlet_id, ou.name AS outlet_name, ou.city AS outlet_city, ou.address AS outlet_address,
+           u.user_id AS customer_id, u.full_name AS customer_name, u.email AS customer_email,
+           p.amount, p.payment_method, p.payment_status, p.transaction_ref, p.updated_at AS payment_updated,
+           d.delivery_status, d.courier, d.tracking_number, d.updated_at AS delivery_updated
+      FROM orders o
+      JOIN outlets ou   ON ou.outlet_id = o.outlet_id
+      JOIN app_users u  ON u.user_id    = o.customer_id
+      LEFT JOIN payments p   ON p.order_id = o.order_id
+      LEFT JOIN deliveries d ON d.order_id = o.order_id"""
 
 
-def _get_order(db: Session, order_id: int, user: User) -> Order:
-    order = db.scalar(select(Order).options(*LOAD).where(Order.id == order_id))
-    if not order:
+def load_orders(db: oracledb.Connection, where: str = "", params: dict | None = None, limit: int = 1000) -> list[OrderOut]:
+    rows = query(db, f"{ORDER_SELECT} {where} ORDER BY o.created_at DESC, o.order_id DESC FETCH FIRST {int(limit)} ROWS ONLY",
+                 params)
+    if not rows:
+        return []
+    # Fetch all items for these orders in one query (order ids passed as a JSON array).
+    items = query(db, """
+        SELECT oi.order_id, oi.product_id, oi.quantity, oi.unit_price, pr.sku, pr.name
+          FROM order_items oi JOIN products pr ON pr.product_id = oi.product_id
+         WHERE oi.order_id IN (SELECT id FROM JSON_TABLE(:ids, '$[*]' COLUMNS (id NUMBER PATH '$')))
+         ORDER BY oi.order_item_id""", {"ids": json.dumps([r["order_id"] for r in rows])})
+    by_order: dict[int, list] = {}
+    for i in items:
+        by_order.setdefault(i["order_id"], []).append(
+            {"product_id": i["product_id"], "quantity": i["quantity"], "unit_price": i["unit_price"],
+             "product": {"id": i["product_id"], "sku": i["sku"], "name": i["name"]}})
+    return [OrderOut(
+        id=r["order_id"], status=r["order_status"], total_amount=r["total_amount"],
+        shipping_address=r["shipping_address"], created_at=r["created_at"],
+        outlet={"id": r["outlet_id"], "name": r["outlet_name"], "city": r["outlet_city"], "address": r["outlet_address"]},
+        customer={"id": r["customer_id"], "name": r["customer_name"], "email": r["customer_email"]},
+        items=by_order.get(r["order_id"], []),
+        payment={"amount": r["amount"], "method": r["payment_method"], "status": r["payment_status"],
+                 "transaction_ref": r["transaction_ref"], "updated_at": r["payment_updated"]} if r["payment_status"] else None,
+        delivery={"status": r["delivery_status"], "courier": r["courier"], "tracking_number": r["tracking_number"],
+                  "updated_at": r["delivery_updated"]} if r["delivery_status"] else None,
+    ) for r in rows]
+
+
+def get_order_for(db: oracledb.Connection, order_id: int, user: dict) -> OrderOut:
+    found = load_orders(db, "WHERE o.order_id = :id", {"id": order_id})
+    if not found:
         raise HTTPException(404, "Order not found")
-    if user.role != Role.ADMIN and order.customer_id != user.id:
-        raise HTTPException(403, "Not your order")  # customers only see their own orders
-    return order
+    if user["role"] != "ADMIN" and found[0].customer.id != user["id"]:
+        raise HTTPException(403, "Not your order")      # customers only see their own orders
+    return found[0]
 
 
 @router.post("", response_model=OrderOut, status_code=201)
-def place_order(data: OrderIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Customer checkout. Stock is reserved (deducted) immediately so it can't be oversold;
-    it is returned automatically if the order is cancelled."""
-    if not db.get(Outlet, data.outlet_id):
-        raise HTTPException(404, "Outlet not found")
-    order = Order(customer_id=user.id, outlet_id=data.outlet_id, total_amount=0,
-                  shipping_address=data.shipping_address)
-    db.add(order)
-    db.flush()  # get order.id
-
-    total = 0.0
-    merged: dict[int, int] = {}
-    for item in data.items:
-        merged[item.product_id] = merged.get(item.product_id, 0) + item.quantity
-    for product_id, qty in merged.items():
-        product = db.get(Product, product_id)
-        if not product or not product.is_active:
-            db.rollback()
-            raise HTTPException(404, f"Product {product_id} not available")
-        try:
-            change_stock(db, product_id=product_id, outlet_id=data.outlet_id, change=-qty,
-                         movement_type=MovementType.SALE, user_id=user.id, order_id=order.id)
-        except HTTPException:
-            db.rollback()  # undo everything in this order — all-or-nothing
-            raise
-        db.add(OrderItem(order_id=order.id, product_id=product_id, quantity=qty, unit_price=product.price))
-        total += float(product.price) * qty
-
-    order.total_amount = round(total, 2)
-    db.add(Payment(order_id=order.id, amount=order.total_amount, status=PaymentStatus.PENDING))
-    db.add(Delivery(order_id=order.id, status=DeliveryStatus.NOT_SHIPPED))
-    db.commit()
-    return _get_order(db, order.id, user)
+def place_order(data: OrderIn, db: oracledb.Connection = Depends(get_db), user: dict = Depends(get_current_user)):
+    """Checkout. INVENTORY_PKG.PLACE_ORDER reserves the stock in one transaction (all items or none)."""
+    result = call_procedure(db, "inventory_pkg.place_order", out_numbers=("p_order_id",),
+                            p_customer_id=user["id"], p_outlet_id=data.outlet_id,
+                            p_shipping_address=data.shipping_address,
+                            p_items_json=json.dumps([i.model_dump() for i in data.items]))
+    return get_order_for(db, int(result["p_order_id"]), user)
 
 
 @router.get("/my", response_model=list[OrderOut])
-def my_orders(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return db.scalars(select(Order).options(*LOAD).where(Order.customer_id == user.id)
-                      .order_by(Order.created_at.desc())).all()
+def my_orders(db: oracledb.Connection = Depends(get_db), user: dict = Depends(get_current_user)):
+    return load_orders(db, "WHERE o.customer_id = :customer_id", {"customer_id": user["id"]})
 
 
 @router.get("", response_model=list[OrderOut])
 def all_orders(status: OrderStatus | None = None, outlet_id: int | None = None,
                delivery_status: DeliveryStatus | None = None, limit: int = Query(200, le=1000),
-               db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    q = select(Order).options(*LOAD).order_by(Order.created_at.desc()).limit(limit)
+               db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+    where, params = [], {}
     if status:
-        q = q.where(Order.status == status)
+        where.append("o.order_status = :status")
+        params["status"] = status.value
     if outlet_id:
-        q = q.where(Order.outlet_id == outlet_id)
+        where.append("o.outlet_id = :outlet_id")
+        params["outlet_id"] = outlet_id
     if delivery_status:
-        q = q.join(Delivery).where(Delivery.status == delivery_status)
-    return db.scalars(q).all()
+        where.append("d.delivery_status = :dstatus")
+        params["dstatus"] = delivery_status.value
+    return load_orders(db, ("WHERE " + " AND ".join(where)) if where else "", params, limit)
 
 
 @router.get("/{order_id}", response_model=OrderOut)
-def get_order(order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return _get_order(db, order_id, user)
+def get_order(order_id: int, db: oracledb.Connection = Depends(get_db), user: dict = Depends(get_current_user)):
+    return get_order_for(db, order_id, user)
 
 
 @router.post("/{order_id}/pay", response_model=OrderOut)
-def pay(order_id: int, data: PaymentIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Demo payment gateway. In production this would call Razorpay/Stripe and verify
-    their signed webhook. Test rule: card ending in 0000 or UPI id starting with 'fail' is declined."""
-    order = _get_order(db, order_id, user)
-    if order.status != OrderStatus.PENDING_PAYMENT:
-        raise HTTPException(409, f"Order is {order.status.value}, cannot pay")
+def pay(order_id: int, data: PaymentIn, db: oracledb.Connection = Depends(get_db),
+        user: dict = Depends(get_current_user)):
+    """Demo payment gateway. A real gateway (Razorpay/Stripe) would decide success here; the result is
+    then saved by INVENTORY_PKG.RECORD_PAYMENT. Test rule: card ending 0000 or UPI id starting 'fail' is declined."""
+    get_order_for(db, order_id, user)                       # 404 / 403 checks
     declined = (data.method == "CARD" and (data.card_number or "").replace(" ", "").endswith("0000")) or \
                (data.method == "UPI" and (data.upi_id or "").lower().startswith("fail"))
-    pay_row = order.payment
-    pay_row.method = data.method
-    if declined:
-        pay_row.status = PaymentStatus.FAILED  # order stays PENDING_PAYMENT so the customer can retry
-    else:
-        pay_row.status = PaymentStatus.SUCCESS
-        pay_row.transaction_ref = "TXN-" + uuid.uuid4().hex[:12].upper()
-        order.status = OrderStatus.PAID
-        order.delivery.status = DeliveryStatus.PACKED
-    db.commit()
+    call_procedure(db, "inventory_pkg.record_payment",
+                   p_order_id=order_id, p_method=data.method, p_success=0 if declined else 1)
     if declined:
         raise HTTPException(402, "Payment declined by bank. Please try another method.")
-    return _get_order(db, order_id, user)
+    return get_order_for(db, order_id, user)
 
 
 @router.post("/{order_id}/cancel", response_model=OrderOut)
-def cancel(order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Cancel before shipping: stock goes back to the outlet and a paid order is refunded."""
-    order = _get_order(db, order_id, user)
-    if order.status == OrderStatus.CANCELLED:
-        raise HTTPException(409, "Order already cancelled")
-    if order.delivery.status not in (DeliveryStatus.NOT_SHIPPED, DeliveryStatus.PACKED):
-        raise HTTPException(409, "Order already shipped, cannot cancel")
-    for item in order.items:
-        change_stock(db, product_id=item.product_id, outlet_id=order.outlet_id, change=item.quantity,
-                     movement_type=MovementType.CANCEL, user_id=user.id, order_id=order.id,
-                     note=f"Order #{order.id} cancelled")
-    if order.payment.status == PaymentStatus.SUCCESS:
-        order.payment.status = PaymentStatus.REFUNDED
-    order.status = OrderStatus.CANCELLED
-    db.commit()
-    return _get_order(db, order_id, user)
+def cancel(order_id: int, db: oracledb.Connection = Depends(get_db), user: dict = Depends(get_current_user)):
+    """Cancel before shipping: INVENTORY_PKG.CANCEL_ORDER returns stock and refunds a paid order."""
+    get_order_for(db, order_id, user)
+    call_procedure(db, "inventory_pkg.cancel_order", p_order_id=order_id, p_user_id=user["id"])
+    return get_order_for(db, order_id, user)
 
 
 @router.patch("/{order_id}/delivery", response_model=OrderOut)
-def update_delivery(order_id: int, data: DeliveryUpdateIn, db: Session = Depends(get_db),
-                    admin: User = Depends(require_admin)):
-    order = _get_order(db, order_id, admin)
-    if order.status != OrderStatus.PAID:
-        raise HTTPException(409, "Only paid orders can be shipped")
-    order.delivery.status = data.status
-    if data.tracking_number is not None:
-        order.delivery.tracking_number = data.tracking_number
-    if data.courier is not None:
-        order.delivery.courier = data.courier
-    db.commit()
-    return _get_order(db, order_id, admin)
+def update_delivery(order_id: int, data: DeliveryUpdateIn, db: oracledb.Connection = Depends(get_db),
+                    admin: dict = Depends(require_admin)):
+    get_order_for(db, order_id, admin)
+    call_procedure(db, "inventory_pkg.update_delivery", p_order_id=order_id, p_status=data.status.value,
+                   p_courier=data.courier, p_tracking_number=data.tracking_number)
+    return get_order_for(db, order_id, admin)

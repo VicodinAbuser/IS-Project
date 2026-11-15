@@ -5,14 +5,17 @@ An Information Systems course project built as a **3-tier web application**.
 | Tier | Technology | Folder |
 |---|---|---|
 | Presentation (UI) | Angular 19 (TypeScript, SCSS, Chart.js) | `frontend/` |
-| Application / business logic | Python FastAPI (REST API, JWT security) | `backend/app/` |
-| Data | SQL database through SQLAlchemy ORM: SQLite for the demo, PostgreSQL in production | `backend/inventory.db` |
+| Application | Python FastAPI (REST API, JWT security) | `backend/app/` |
+| Data + business rules | **Oracle AI Database 26ai**: tables, PL/SQL package `INVENTORY_PKG`, trigger, views | `database/` |
 
 ```mermaid
 flowchart LR
-  B[Browser<br/>Angular UI :4200] -- "HTTP + JSON<br/>Authorization: Bearer JWT" --> A[FastAPI backend :8000<br/>routers → business rules → ORM]
-  A -- "SQL via SQLAlchemy" --> D[(SQLite / PostgreSQL)]
+  B[Browser<br/>Angular UI :4200] -- "HTTP + JSON<br/>Authorization: Bearer JWT" --> A[FastAPI backend :8000<br/>security, validation, routing]
+  A -- "python-oracledb<br/>SELECT on views +<br/>CALL INVENTORY_PKG.*" --> D[(Oracle 26ai<br/>schema INVENTORY)]
+  S[SQL Developer] -- "same tables & procedures" --> D
 ```
+
+The Python API and SQL Developer both use **the same stored procedures**, so a stock change made in either place follows the same rules and shows up in the other straight away.
 
 ## Features
 
@@ -34,20 +37,43 @@ flowchart LR
 
 ## How to run
 
-You need **Python 3.10+** and **Node.js 18+**.
+You need:
+- **Oracle AI Database 26ai** (the Free edition is fine) and **Oracle SQL Developer**
+- **Python 3.10+**
+- **Node.js 18+**
 
-### 1. Backend (port 8000)
+### 1. Database (one-time, in SQL Developer)
+1. Connect as **SYSTEM** to the pluggable database. Host `localhost`, port `1521`, **Service name** `FREEPDB1`.
+2. Open `database/00_create_user.sql` and run it as a script (**F5**). This creates the `INVENTORY` user, plus `INVENTORY_TEST` for automated tests.
+3. Create a new connection as **INVENTORY** / `inventory123`, with the same host, port and service.
+4. In that connection, run these files in order with **F5**:
+
+| File | What it creates |
+|---|---|
+| `database/01_schema.sql` | 11 tables, constraints, indexes |
+| `database/02_inventory_pkg.sql` | PL/SQL package `INVENTORY_PKG`, trigger `TRG_INVENTORY_AUDIT`, 4 views |
+| `database/03_seed_data.sql` | Demo data: 13 products, 4 outlets, about 260 orders over two years |
+
+Shortcut for step 4: after step 3 of the backend setup below, `python setup_db.py` runs the same three files for you.
+
+If your service name or password is different, create `backend/.env`:
+```
+ORACLE_DSN=localhost:1521/FREEPDB1
+ORACLE_USER=inventory
+ORACLE_PASSWORD=inventory123
+```
+
+### 2. Backend (port 8000)
 ```bash
 cd backend
 python -m venv .venv
 # Windows: .venv\Scripts\activate     Mac/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-python seed.py            # creates the database with demo data (use --reset to start over)
 uvicorn app.main:app --reload
 ```
 Interactive API docs (good for the demo): http://localhost:8000/docs
 
-### 2. Frontend (port 4200), in a second terminal
+### 3. Frontend (port 4200), in a second terminal
 ```bash
 cd frontend
 npm install
@@ -64,16 +90,19 @@ Payment test rule: a card ending in `0000`, or a UPI ID starting with `fail`, is
 
 ### Tests
 ```bash
-cd backend && pytest -q        # API tests: security, purchase flow, cancel, transfer, reports
+cd backend && pytest -q        # API tests on a real Oracle DB (uses the INVENTORY_TEST schema)
 cd frontend && npm test        # Angular unit tests (*.spec.ts)
 ```
 
-### Switch to PostgreSQL (optional)
-Create `backend/.env` containing:
-```
-DATABASE_URL=postgresql+psycopg2://postgres:password@localhost:5432/inventory
-```
-Then run `python seed.py` again. No code changes are needed, because the ORM generates the right SQL for each database.
+## Presentation demo with SQL Developer
+Open `database/04_demo_queries.sql` while the website is running. It walks through:
+1. Showing every table, view, package and trigger, all VALID
+2. Stock per outlet, low-stock alerts, collective stock, quarterly sales, straight from the views
+3. **Database → website**: `EXEC inventory_pkg.restock(...)` in SQL Developer, then refresh the Inventory page and +50 appears
+4. The trigger logged it automatically in `STOCK_MOVEMENTS`. Even a plain `UPDATE` is logged, as `MANUAL`.
+5. A business rule enforced by Oracle: ordering 9,999 units fails with `ORA-20001: Not enough stock`, and nothing is saved
+6. Placing an order from PL/SQL. It then appears in the customer's "My orders" page.
+7. **Website → database**: buy in the browser, then `SELECT` the new order in SQL Developer
 
 ## Data model (ER diagram)
 
@@ -105,13 +134,40 @@ erDiagram
   SUPPLIERS { int id PK; string name UK }
 ```
 
+(The database table names are `APP_USERS`, `OUTLETS`, `PRODUCTS` and so on. Primary keys are `<table>_id` identity columns.)
+
 Design decisions worth explaining:
 - **`inventory` is a junction table** between products and outlets, which gives one stock row per product per outlet. Collective stock is just `SUM(quantity) GROUP BY product`.
-- **`stock_movements` is an audit log.** Every stock change goes through one function (`inventory_service.change_stock`), so the stock level and its history can't drift apart.
+- **`stock_movements` is an audit log** filled by trigger `TRG_INVENTORY_AUDIT` on every change to `inventory.quantity`. The stock level and its history can't drift apart, even with manual SQL.
 - **`order_items.unit_price`** stores the price *at the time of purchase*, so later price changes don't rewrite old reports.
-- **Constraints in the database**: `quantity >= 0`, `price >= 0`, unique SKU and email, and foreign keys. Even buggy code can't save invalid data.
+- **Constraints in the database**: `quantity >= 0`, `price >= 0`, allowed status values, unique SKU and email, and foreign keys. Even buggy code can't save invalid data.
 - **Indexes** on `orders(created_at, status)`, `sku`, `email` and `stock_movements.created_at` keep reports and lookups fast.
 - **Normalised to 3NF**: no repeated product or outlet data inside orders.
+
+## PL/SQL package `INVENTORY_PKG`
+
+| Procedure / function | What it does | Called by API endpoint |
+|---|---|---|
+| `restock(product, outlet, qty, note, user)` | New stock arrives | `POST /api/inventory/restock` |
+| `adjust_stock(product, outlet, change, note, user)` | Damage or audit correction (+/−) | `POST /api/inventory/adjust` |
+| `transfer_stock(product, from, to, qty, note, user)` | Moves stock between outlets in one transaction | `POST /api/inventory/transfer` |
+| `place_order(customer, outlet, address, items_json, OUT order_id)` | Checks and reserves stock, creates order, items, payment and delivery rows. All or nothing. | `POST /api/orders` |
+| `record_payment(order, method, success, txn_ref)` | Saves the gateway result. On success: PAID and PACKED. | `POST /api/orders/{id}/pay` |
+| `cancel_order(order, user)` | Returns stock and refunds the payment (before shipping only) | `POST /api/orders/{id}/cancel` |
+| `update_delivery(order, status, courier, tracking)` | Delivery tracking (paid orders only) | `PATCH /api/orders/{id}/delivery` |
+| `stock_at(product, outlet)` / `total_stock(product)` | Functions used inside the product `SELECT` | `GET /api/products` |
+| `change_stock(...)` | Core rule used by all of the above: locks the row, checks stock, updates it | (internal) |
+
+Errors are raised with `RAISE_APPLICATION_ERROR`, and the API translates them into HTTP status codes:
+
+| Oracle error | Meaning | HTTP |
+|---|---|---|
+| `ORA-20001` | Not enough stock | 409 |
+| `ORA-20004` | Not found | 404 |
+| `ORA-20009` | Wrong state (e.g. order already shipped) | 409 |
+| `ORA-20022` | Bad input | 422 |
+
+**Views** used by the API: `V_INVENTORY_STATUS` (stock + low-stock flag), `V_PRODUCT_STOCK` (collective totals), `V_SALES_LINES` (paid order lines with year, quarter and month), `V_QUARTERLY_SALES`.
 
 ## REST API (backend ↔ UI contract)
 
@@ -138,17 +194,21 @@ Design decisions worth explaining:
 ## Project structure
 
 ```
+database/
+  00_create_user.sql       run as SYSTEM: creates the INVENTORY schema
+  01_schema.sql            tables, constraints, indexes
+  02_inventory_pkg.sql     PL/SQL package, audit trigger, views (the business logic)
+  03_seed_data.sql         demo data
+  04_demo_queries.sql      queries for the live presentation
 backend/
-  app/main.py              FastAPI app, CORS, router registration
-  app/config.py            settings (DB URL, JWT secret), overridable with .env
-  app/database.py          engine + session per request (DB connection)
-  app/models.py            tables (ORM classes)
+  app/main.py              FastAPI app, CORS, Oracle error → HTTP mapping
+  app/config.py            settings (Oracle DSN/user, JWT secret), overridable with .env
+  app/database.py          Oracle connection pool + query / call_procedure helpers
   app/schemas.py           request/response validation (Pydantic)
   app/security.py          bcrypt hashing, JWT creation/verification, admin check
-  app/inventory_service.py core stock rule: change stock + write audit log
   app/routers/             auth, catalog, inventory, orders, reports endpoints
-  seed.py                  demo data (13 products, 4 outlets, ~260 orders over two years)
-  tests/test_api.py        automated API tests
+  setup_db.py              runs the database/*.sql files from Python
+  tests/test_api.py        automated API tests against Oracle
 frontend/src/
   index.html, styles.scss  page shell + global design system
   environments/            API base URL
@@ -164,7 +224,13 @@ frontend/src/
 ## Viva / Q&A preparation
 
 **How is the database connected to the backend?**
-`database.py` creates a SQLAlchemy *engine* from `DATABASE_URL`. Each API request gets its own *session* through FastAPI's dependency injection (`Depends(get_db)`), and the session is closed after the response. The models in `models.py` map Python classes to tables, and the ORM turns queries into SQL and uses parameter binding, which prevents SQL injection.
+`app/database.py` uses **python-oracledb**, Oracle's official Python driver. In its "thin" mode no Oracle Client install is needed. When the server starts, it opens a **connection pool** to `localhost:1521/FREEPDB1` as user `INVENTORY`. Each API request borrows one connection through FastAPI's dependency injection (`Depends(get_db)`) and returns it afterwards.
+- **Reads** are plain SQL `SELECT`s, mostly on the views. For example, `SELECT * FROM v_inventory_status WHERE outlet_id = :outlet_id`.
+- **Writes** call the PL/SQL package, e.g. `cursor.callproc("inventory_pkg.restock", keyword_parameters={...})`.
+- All values are passed as **bind variables** (`:name`), never pasted into the SQL text. This prevents SQL injection and lets Oracle reuse execution plans.
+
+**Why put business logic in PL/SQL?**
+The rules sit next to the data. Every client follows the same rules: the website, SQL Developer and any future mobile app. The work also happens in one round trip to the database, and the transaction is handled inside Oracle (`COMMIT` on success, `ROLLBACK` on any error).
 
 **How does the UI sync with the backend?**
 Angular components call `ApiService`, which uses `HttpClient` to send JSON over HTTP to the REST endpoints. `authInterceptor` adds the `Authorization: Bearer <JWT>` header to every request. Responses are typed with the interfaces in `models.ts`, which mirror the backend's Pydantic schemas. After any change, such as a restock, the component fetches the data again, so the screen always shows what's in the database. CORS in `main.py` allows the UI's origin (port 4200) to call the API (port 8000).
@@ -182,7 +248,10 @@ It uses standalone Angular components. Each page has a `.ts` class (state held i
 - Route guards on the UI are for convenience only. The real enforcement happens on the server.
 
 **How do you prevent overselling?**
-Placing an order deducts stock inside a **database transaction**. If any item doesn't have enough stock, the whole order is rolled back (all or nothing). On PostgreSQL, `SELECT … FOR UPDATE` locks the stock row, so two people buying at the same moment can't both take the last unit. The `quantity >= 0` constraint is a final safety net.
+`INVENTORY_PKG.PLACE_ORDER` runs as **one transaction**. For each item, `change_stock` locks the stock row with `SELECT … FOR UPDATE`, so two people buying at the same moment can't both take the last unit. If any item is short, Oracle raises `ORA-20001` and the procedure runs `ROLLBACK`, so nothing is saved (all or nothing). Items are processed in product-ID order to avoid deadlocks. The `CHECK (quantity >= 0)` constraint is a final safety net.
+
+**What does the trigger do?**
+`TRG_INVENTORY_AUDIT` fires `AFTER INSERT OR UPDATE OF quantity ON inventory FOR EACH ROW` and writes the change to `STOCK_MOVEMENTS`. The procedures first fill package variables (movement type, user, order, note) so the trigger knows *why* the stock changed. If someone runs a plain `UPDATE`, those variables are empty and the change is logged as `MANUAL`, along with the database user's name.
 
 **What happens when stock changes?**
 
@@ -195,24 +264,24 @@ Placing an order deducts stock inside a **database transaction**. If any item do
 | Moved between outlets | − / + | TRANSFER_OUT / TRANSFER_IN |
 
 **How are quarterly reports made?**
-The backend runs `GROUP BY` aggregate queries (`SUM`, `COUNT`) on paid orders between the quarter's start and end dates. The results go to the UI as JSON for the charts, and **openpyxl** builds the Excel file for download.
+The view `V_SALES_LINES` joins paid orders, items, products, outlets and categories, and adds `sales_year` / `sales_quarter` / `sales_month` columns. The API runs `GROUP BY` aggregates (`SUM`, `COUNT DISTINCT`) on it for the chosen quarter. The results go to the UI as JSON for the charts, and **openpyxl** builds the Excel file for download.
 
 **Why FastAPI rather than Java Spring Boot?**
-It needs far less code, validates data automatically, generates Swagger docs at `/docs`, and is one of the fastest Python frameworks. The 3-tier design would be identical in Spring Boot: controllers = routers, entities = models, DTOs = schemas.
+It needs far less code, validates data automatically, generates Swagger docs at `/docs`, and is one of the fastest Python frameworks. The 3-tier design would be identical in Spring Boot: controllers = routers, DTOs = schemas, and JDBC `CallableStatement` = `callproc`.
 
 **How would this go to production?**
-- Switch to PostgreSQL by changing `DATABASE_URL`.
+- Point `ORACLE_DSN` at the production database, use a strong password and a least-privilege account (e.g. a user that can only `EXECUTE` the package and `SELECT` the views).
 - Set a strong `JWT_SECRET`.
 - Use a real payment gateway (Razorpay or Stripe) with webhook signature verification.
 - Run with `ng build` + Nginx and `uvicorn` behind HTTPS.
-- Add database migrations with Alembic.
+- Keep the `database/*.sql` scripts in version control as migration steps.
 
 ## SDLC phases (for the presentation)
 1. **Planning**: problem (stock spread across outlets, manual tracking), scope, two user roles
 2. **Requirements**: the feature lists above (functional); security, speed and auditability (non-functional)
 3. **Design**: 3-tier architecture, ER diagram, REST API contract, UI screens
-4. **Development**: backend first (models → services → routers), then Angular pages
-5. **Testing**: pytest API tests + Angular unit tests + manual end-to-end demo
+4. **Development**: database first (tables → PL/SQL package → views), then API routers, then Angular pages
+5. **Testing**: pytest API tests on real Oracle, Angular unit tests, SQL demo script, manual end-to-end demo
 6. **Deployment and maintenance**: production checklist above
 
 Screenshots of every page are in `docs/screenshots/`.

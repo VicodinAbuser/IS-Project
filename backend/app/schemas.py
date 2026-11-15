@@ -1,9 +1,46 @@
 """Pydantic schemas: validate request bodies and shape JSON responses (the API contract)."""
+import enum
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from .models import DeliveryStatus, MovementType, OrderStatus, PaymentStatus, Role
+
+# Allowed values. They match the CHECK constraints in database/01_schema.sql.
+class Role(str, enum.Enum):
+    ADMIN = "ADMIN"
+    CUSTOMER = "CUSTOMER"
+
+
+class OrderStatus(str, enum.Enum):
+    PENDING_PAYMENT = "PENDING_PAYMENT"
+    PAID = "PAID"
+    CANCELLED = "CANCELLED"
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    REFUNDED = "REFUNDED"
+
+
+class DeliveryStatus(str, enum.Enum):
+    NOT_SHIPPED = "NOT_SHIPPED"
+    PACKED = "PACKED"
+    SHIPPED = "SHIPPED"
+    OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY"
+    DELIVERED = "DELIVERED"
+    RETURNED = "RETURNED"
+
+
+class MovementType(str, enum.Enum):
+    RESTOCK = "RESTOCK"
+    SALE = "SALE"
+    CANCEL = "CANCEL"
+    ADJUSTMENT = "ADJUSTMENT"
+    TRANSFER_IN = "TRANSFER_IN"
+    TRANSFER_OUT = "TRANSFER_OUT"
+    MANUAL = "MANUAL"          # someone changed INVENTORY directly in SQL Developer
 
 
 class ORM(BaseModel):

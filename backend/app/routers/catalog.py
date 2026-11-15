@@ -1,118 +1,131 @@
 """Products, categories, suppliers and outlets."""
+import oracledb
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
 
-from ..database import get_db
-from ..models import Category, Inventory, Outlet, Product, Supplier, User
+from ..database import execute, get_db, insert_returning_id, query, query_one
 from ..schemas import CategoryOut, OutletIn, OutletOut, ProductIn, ProductOut, SupplierOut
 from ..security import get_current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["Catalogue"])
 
+# Stock comes from PL/SQL functions in INVENTORY_PKG, called inside the SELECT.
+PRODUCT_SELECT = """
+    SELECT p.product_id AS id, p.sku, p.name, p.description, p.price, p.image_url,
+           p.reorder_level, p.is_active,
+           c.category_id, c.name AS category_name,
+           s.supplier_id, s.name AS supplier_name, s.contact_email AS supplier_email, s.phone AS supplier_phone,
+           {stock} AS total_stock
+      FROM products p
+      LEFT JOIN categories c ON c.category_id = p.category_id
+      LEFT JOIN suppliers  s ON s.supplier_id = p.supplier_id"""
+TOTAL_STOCK = "inventory_pkg.total_stock(p.product_id)"
+OUTLET_STOCK = "inventory_pkg.stock_at(p.product_id, :outlet_id)"
 
-def _stock_map(db: Session, product_ids: list[int], outlet_id: int | None = None) -> dict[int, int]:
-    q = select(Inventory.product_id, func.coalesce(func.sum(Inventory.quantity), 0)) \
-        .where(Inventory.product_id.in_(product_ids)).group_by(Inventory.product_id)
-    if outlet_id:
-        q = q.where(Inventory.outlet_id == outlet_id)
-    return dict(db.execute(q).all())
+
+def to_product(r: dict) -> ProductOut:
+    return ProductOut(
+        **{k: r[k] for k in ("id", "sku", "name", "description", "price", "image_url", "reorder_level", "total_stock")},
+        is_active=bool(r["is_active"]),
+        category={"id": r["category_id"], "name": r["category_name"]} if r["category_id"] else None,
+        supplier={"id": r["supplier_id"], "name": r["supplier_name"], "contact_email": r["supplier_email"],
+                  "phone": r["supplier_phone"]} if r["supplier_id"] else None,
+    )
 
 
-def _with_stock(db: Session, products: list[Product], outlet_id: int | None = None) -> list[ProductOut]:
-    stock = _stock_map(db, [p.id for p in products], outlet_id)
-    return [ProductOut.model_validate(p).model_copy(update={"total_stock": stock.get(p.id, 0)})
-            for p in products]
+def fetch_product(db: oracledb.Connection, product_id: int) -> ProductOut:
+    row = query_one(db, PRODUCT_SELECT.format(stock=TOTAL_STOCK) + " WHERE p.product_id = :id", {"id": product_id})
+    if not row:
+        raise HTTPException(404, "Product not found")
+    return to_product(row)
 
 
 @router.get("/products", response_model=list[ProductOut])
 def list_products(search: str | None = None, category_id: int | None = None,
                   outlet_id: int | None = Query(None, description="Show stock for one outlet only"),
                   include_inactive: bool = False,
-                  db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    q = select(Product).options(selectinload(Product.category), selectinload(Product.supplier)) \
-        .order_by(Product.name)
+                  db: oracledb.Connection = Depends(get_db), _: dict = Depends(get_current_user)):
+    where, params = [], {}
     if not include_inactive:
-        q = q.where(Product.is_active.is_(True))
+        where.append("p.is_active = 1")
     if search:
-        like = f"%{search}%"
-        q = q.where(or_(Product.name.ilike(like), Product.sku.ilike(like)))
+        where.append("(UPPER(p.name) LIKE UPPER(:search) OR UPPER(p.sku) LIKE UPPER(:search))")
+        params["search"] = f"%{search}%"
     if category_id:
-        q = q.where(Product.category_id == category_id)
-    return _with_stock(db, list(db.scalars(q)), outlet_id)
+        where.append("p.category_id = :category_id")
+        params["category_id"] = category_id
+    stock = TOTAL_STOCK
+    if outlet_id:
+        stock = OUTLET_STOCK
+        params["outlet_id"] = outlet_id
+    sql = PRODUCT_SELECT.format(stock=stock)
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    return [to_product(r) for r in query(db, sql + " ORDER BY p.name", params)]
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)
-def get_product(product_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    p = db.get(Product, product_id)
-    if not p:
-        raise HTTPException(404, "Product not found")
-    return _with_stock(db, [p])[0]
+def get_product(product_id: int, db: oracledb.Connection = Depends(get_db), _: dict = Depends(get_current_user)):
+    return fetch_product(db, product_id)
+
+
+def _product_params(data: ProductIn) -> dict:
+    params = data.model_dump()
+    params["is_active"] = 1 if data.is_active else 0
+    return params
 
 
 @router.post("/products", response_model=ProductOut, status_code=201)
-def create_product(data: ProductIn, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    p = Product(**data.model_dump())
-    db.add(p)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "SKU already exists or invalid category/supplier")
-    db.refresh(p)
-    return _with_stock(db, [p])[0]
+def create_product(data: ProductIn, db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+    new_id = insert_returning_id(db, """
+        INSERT INTO products (sku, name, description, price, image_url, reorder_level, is_active, category_id, supplier_id)
+        VALUES (:sku, :name, :description, :price, :image_url, :reorder_level, :is_active, :category_id, :supplier_id)
+        RETURNING product_id INTO :new_id""", _product_params(data))
+    db.commit()
+    return fetch_product(db, new_id)
 
 
 @router.put("/products/{product_id}", response_model=ProductOut)
-def update_product(product_id: int, data: ProductIn, db: Session = Depends(get_db),
-                   _: User = Depends(require_admin)):
-    p = db.get(Product, product_id)
-    if not p:
+def update_product(product_id: int, data: ProductIn, db: oracledb.Connection = Depends(get_db),
+                   _: dict = Depends(require_admin)):
+    count = execute(db, """
+        UPDATE products
+           SET sku = :sku, name = :name, description = :description, price = :price, image_url = :image_url,
+               reorder_level = :reorder_level, is_active = :is_active, category_id = :category_id,
+               supplier_id = :supplier_id
+         WHERE product_id = :id""", {**_product_params(data), "id": product_id})
+    if count == 0:
         raise HTTPException(404, "Product not found")
-    for k, v in data.model_dump().items():
-        setattr(p, k, v)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "SKU already exists or invalid category/supplier")
-    db.refresh(p)
-    return _with_stock(db, [p])[0]
+    db.commit()
+    return fetch_product(db, product_id)
 
 
 @router.delete("/products/{product_id}", status_code=204)
-def deactivate_product(product_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def deactivate_product(product_id: int, db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
     """Soft delete: hides the product from the shop but keeps order history intact."""
-    p = db.get(Product, product_id)
-    if not p:
+    if execute(db, "UPDATE products SET is_active = 0 WHERE product_id = :id", {"id": product_id}) == 0:
         raise HTTPException(404, "Product not found")
-    p.is_active = False
     db.commit()
 
 
 @router.get("/categories", response_model=list[CategoryOut])
-def list_categories(db: Session = Depends(get_db)):
-    return db.scalars(select(Category).order_by(Category.name)).all()
+def list_categories(db: oracledb.Connection = Depends(get_db)):
+    return query(db, "SELECT category_id AS id, name FROM categories ORDER BY name")
 
 
 @router.get("/suppliers", response_model=list[SupplierOut])
-def list_suppliers(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    return db.scalars(select(Supplier).order_by(Supplier.name)).all()
+def list_suppliers(db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+    return query(db, "SELECT supplier_id AS id, name, contact_email, phone FROM suppliers ORDER BY name")
 
 
 @router.get("/outlets", response_model=list[OutletOut])
-def list_outlets(db: Session = Depends(get_db)):
-    return db.scalars(select(Outlet).order_by(Outlet.name)).all()
+def list_outlets(db: oracledb.Connection = Depends(get_db)):
+    return query(db, "SELECT outlet_id AS id, name, city, address FROM outlets ORDER BY name")
 
 
 @router.post("/outlets", response_model=OutletOut, status_code=201)
-def create_outlet(data: OutletIn, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    o = Outlet(**data.model_dump())
-    db.add(o)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(409, "Outlet name already exists")
-    return o
+def create_outlet(data: OutletIn, db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+    new_id = insert_returning_id(db, """
+        INSERT INTO outlets (name, city, address) VALUES (:name, :city, :address)
+        RETURNING outlet_id INTO :new_id""", data.model_dump())
+    db.commit()
+    return query_one(db, "SELECT outlet_id AS id, name, city, address FROM outlets WHERE outlet_id = :id", {"id": new_id})

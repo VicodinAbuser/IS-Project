@@ -1,103 +1,73 @@
 """Admin dashboard numbers and quarterly reports (JSON for charts, CSV/Excel for download)."""
 import csv
 import io
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import oracledb
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import (Category, Delivery, DeliveryStatus, Inventory, Order, OrderItem, OrderStatus,
-                      Outlet, Product, User)
+from ..database import get_db, query, query_one
 from ..security import require_admin
 
 router = APIRouter(prefix="/api/reports", tags=["Reports (admin)"])
-
-
-def quarter_range(year: int, quarter: int) -> tuple[datetime, datetime]:
-    start = datetime(year, 3 * (quarter - 1) + 1, 1, tzinfo=timezone.utc)
-    end = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if quarter == 4 else \
-        datetime(year, 3 * quarter + 1, 1, tzinfo=timezone.utc)
-    return start, end
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    paid = Order.status == OrderStatus.PAID
-    low = db.scalar(select(func.count()).select_from(Inventory).join(Product)
-                    .where(Inventory.quantity <= Product.reorder_level, Product.is_active.is_(True)))
-    return {
-        "total_revenue": round(float(db.scalar(select(func.coalesce(func.sum(Order.total_amount), 0)).where(paid))), 2),
-        "paid_orders": db.scalar(select(func.count()).select_from(Order).where(paid)),
-        "pending_payment": db.scalar(select(func.count()).select_from(Order)
-                                     .where(Order.status == OrderStatus.PENDING_PAYMENT)),
-        "to_ship": db.scalar(select(func.count()).select_from(Order).join(Delivery)
-                             .where(paid, Delivery.status.in_([DeliveryStatus.PACKED, DeliveryStatus.NOT_SHIPPED]))),
-        "products": db.scalar(select(func.count()).select_from(Product).where(Product.is_active.is_(True))),
-        "outlets": db.scalar(select(func.count()).select_from(Outlet)),
-        "total_units_in_stock": int(db.scalar(select(func.coalesce(func.sum(Inventory.quantity), 0)))),
-        "low_stock_items": low,
-    }
+def dashboard(db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+    return query_one(db, """
+        SELECT (SELECT NVL(SUM(total_amount), 0) FROM orders WHERE order_status = 'PAID')            AS total_revenue,
+               (SELECT COUNT(*) FROM orders WHERE order_status = 'PAID')                             AS paid_orders,
+               (SELECT COUNT(*) FROM orders WHERE order_status = 'PENDING_PAYMENT')                  AS pending_payment,
+               (SELECT COUNT(*) FROM orders o JOIN deliveries d ON d.order_id = o.order_id
+                 WHERE o.order_status = 'PAID' AND d.delivery_status IN ('NOT_SHIPPED', 'PACKED'))   AS to_ship,
+               (SELECT COUNT(*) FROM products WHERE is_active = 1)                                   AS products,
+               (SELECT COUNT(*) FROM outlets)                                                         AS outlets,
+               (SELECT NVL(SUM(quantity), 0) FROM inventory)                                         AS total_units_in_stock,
+               (SELECT COUNT(*) FROM v_inventory_status WHERE low_stock = 1)                         AS low_stock_items
+          FROM dual""")
 
 
-def build_quarterly(db: Session, year: int, quarter: int) -> dict:
-    start, end = quarter_range(year, quarter)
-    in_q = (Order.status == OrderStatus.PAID, Order.created_at >= start, Order.created_at < end)
-    revenue = OrderItem.quantity * OrderItem.unit_price
+def build_quarterly(db: oracledb.Connection, year: int, quarter: int) -> dict:
+    """Aggregates the V_SALES_LINES view (paid order lines) for one quarter."""
+    start_month = 3 * (quarter - 1) + 1
+    end = f"{year + 1}-01-01" if quarter == 4 else f"{year}-{start_month + 3:02d}-01"
+    p = {"y": year, "q": quarter}
+    in_q = "FROM v_sales_lines WHERE sales_year = :y AND sales_quarter = :q"
 
-    summary = db.execute(select(func.count(func.distinct(Order.id)),
-                                func.coalesce(func.sum(OrderItem.quantity), 0),
-                                func.coalesce(func.sum(revenue), 0))
-                         .select_from(Order).join(OrderItem).where(*in_q)).one()
-
-    by_outlet = db.execute(select(Outlet.name, func.count(func.distinct(Order.id)),
-                                  func.sum(OrderItem.quantity), func.sum(revenue))
-                           .select_from(Order).join(OrderItem).join(Outlet)
-                           .where(*in_q).group_by(Outlet.name).order_by(func.sum(revenue).desc())).all()
-
-    by_product = db.execute(select(Product.sku, Product.name, func.sum(OrderItem.quantity), func.sum(revenue))
-                            .select_from(Order).join(OrderItem).join(Product)
-                            .where(*in_q).group_by(Product.id).order_by(func.sum(revenue).desc())).all()
-
-    by_category = db.execute(select(func.coalesce(Category.name, "Uncategorised"), func.sum(OrderItem.quantity),
-                                    func.sum(revenue))
-                             .select_from(Order).join(OrderItem).join(Product)
-                             .outerjoin(Category, Category.id == Product.category_id)
-                             .where(*in_q).group_by(Category.name).order_by(func.sum(revenue).desc())).all()
-
-    # Monthly breakdown done in Python so it works the same on SQLite and PostgreSQL.
-    months = {start.month + i: 0.0 for i in range(3)}
-    for created, amount in db.execute(select(Order.created_at, Order.total_amount).where(*in_q)).all():
-        months[created.month] = months.get(created.month, 0.0) + float(amount)
-
-    stock = db.execute(select(Outlet.name, func.coalesce(func.sum(Inventory.quantity), 0))
-                       .outerjoin(Inventory, Inventory.outlet_id == Outlet.id)
-                       .group_by(Outlet.name).order_by(Outlet.name)).all()
-
+    summary = query_one(db, f"""SELECT COUNT(DISTINCT order_id) AS orders, NVL(SUM(quantity), 0) AS units_sold,
+                                       NVL(SUM(revenue), 0) AS revenue {in_q}""", p)
+    by_outlet = query(db, f"""SELECT outlet_name AS outlet, COUNT(DISTINCT order_id) AS orders,
+                                     SUM(quantity) AS units, SUM(revenue) AS revenue {in_q}
+                               GROUP BY outlet_name ORDER BY revenue DESC""", p)
+    by_product = query(db, f"""SELECT sku, product_name AS product, SUM(quantity) AS units, SUM(revenue) AS revenue {in_q}
+                                GROUP BY sku, product_name ORDER BY revenue DESC""", p)
+    by_category = query(db, f"""SELECT category_name AS category, SUM(quantity) AS units, SUM(revenue) AS revenue {in_q}
+                                 GROUP BY category_name ORDER BY revenue DESC""", p)
+    monthly_rows = {r["sales_month"]: r["revenue"] for r in
+                    query(db, f"SELECT sales_month, SUM(revenue) AS revenue {in_q} GROUP BY sales_month", p)}
+    stock = query(db, """SELECT o.name AS outlet, NVL(SUM(i.quantity), 0) AS units
+                           FROM outlets o LEFT JOIN inventory i ON i.outlet_id = o.outlet_id
+                          GROUP BY o.name ORDER BY o.name""")
     return {
         "year": year, "quarter": quarter,
-        "period": f"{start.date()} to {end.date()} (exclusive)",
-        "summary": {"orders": summary[0], "units_sold": int(summary[1]), "revenue": round(float(summary[2]), 2)},
-        "by_outlet": [{"outlet": n, "orders": o, "units": int(u), "revenue": round(float(r), 2)}
-                      for n, o, u, r in by_outlet],
-        "by_product": [{"sku": s, "product": n, "units": int(u), "revenue": round(float(r), 2)}
-                       for s, n, u, r in by_product],
-        "by_category": [{"category": c, "units": int(u), "revenue": round(float(r), 2)}
-                        for c, u, r in by_category],
-        "monthly": [{"month": datetime(year, m, 1).strftime("%b"), "revenue": round(v, 2)}
-                    for m, v in sorted(months.items())],
-        "current_stock_by_outlet": [{"outlet": n, "units": int(q)} for n, q in stock],
+        "period": f"{year}-{start_month:02d}-01 to {end} (exclusive)",
+        "summary": {"orders": summary["orders"], "units_sold": int(summary["units_sold"]),
+                    "revenue": round(float(summary["revenue"]), 2)},
+        "by_outlet": [{**r, "units": int(r["units"]), "revenue": round(float(r["revenue"]), 2)} for r in by_outlet],
+        "by_product": [{**r, "units": int(r["units"]), "revenue": round(float(r["revenue"]), 2)} for r in by_product],
+        "by_category": [{**r, "units": int(r["units"]), "revenue": round(float(r["revenue"]), 2)} for r in by_category],
+        "monthly": [{"month": MONTHS[m - 1], "revenue": round(float(monthly_rows.get(m, 0)), 2)}
+                    for m in range(start_month, start_month + 3)],
+        "current_stock_by_outlet": [{"outlet": r["outlet"], "units": int(r["units"])} for r in stock],
     }
-
 
 
 @router.get("/quarterly")
 def quarterly(year: int = Query(..., ge=2000, le=2100), quarter: int = Query(..., ge=1, le=4),
-              db: Session = Depends(get_db), _: User = Depends(require_admin)):
+              db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
     return build_quarterly(db, year, quarter)
 
 
@@ -108,7 +78,7 @@ SECTIONS = [("By outlet", "by_outlet"), ("By product", "by_product"), ("By categ
 @router.get("/quarterly/export")
 def export(year: int = Query(..., ge=2000, le=2100), quarter: int = Query(..., ge=1, le=4),
            format: str = Query("xlsx", pattern="^(csv|xlsx)$"),
-           db: Session = Depends(get_db), _: User = Depends(require_admin)):
+           db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
     data = build_quarterly(db, year, quarter)
     name = f"inventory_report_{year}_Q{quarter}"
 

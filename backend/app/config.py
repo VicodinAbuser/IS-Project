@@ -1,11 +1,14 @@
-"""Application settings. Override any value with an environment variable or a .env file."""
+"""Application settings. Override any value with an environment variable or a backend/.env file."""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # SQLite needs no setup for the demo. For PostgreSQL use e.g.
-    # DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/inventory
-    database_url: str = "sqlite:///./inventory.db"
+    # Oracle connection. DSN format is host:port/service_name.
+    # Oracle AI Database 26ai Free uses the pluggable database FREEPDB1.
+    oracle_user: str = "inventory"
+    oracle_password: str = "inventory123"
+    oracle_dsn: str = "localhost:1521/FREEPDB1"
+
     jwt_secret: str = "change-this-secret-in-production"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 120
