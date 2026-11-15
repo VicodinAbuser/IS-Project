@@ -1,0 +1,22 @@
+<header class="nav">
+  <a class="brand" routerLink="/">📦 StockSmart</a>
+  @if (auth.user(); as user) {
+    <nav>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+        <a routerLink="/admin/inventory" routerLinkActive="active">Inventory</a>
+        <a routerLink="/admin/products" routerLinkActive="active">Products</a>
+        <a routerLink="/admin/orders" routerLinkActive="active">Orders</a>
+        <a routerLink="/admin/reports" routerLinkActive="active">Reports</a>
+      } @else {
+        <a routerLink="/shop" routerLinkActive="active">Shop</a>
+        <a routerLink="/orders" routerLinkActive="active">My orders</a>
+        <a routerLink="/cart" routerLinkActive="active">Cart @if (cart.count()) {<span class="count">{{ cart.count() }}</span>}</a>
+      }
+    </nav>
+    <div class="user">
+      <span>{{ user.name }} <span class="badge info">{{ user.role }}</span></span>
+      <button class="btn secondary sm" (click)="auth.logout()">Logout</button>
+    </div>
+  }
+</header>

@@ -1,0 +1,95 @@
+<div class="page-head"><div><h1>Inventory</h1><p class="muted">Stock per outlet, collective totals and full audit log</p></div></div>
+
+<form class="card" (ngSubmit)="submit()">
+  <div class="tabs">
+    <button type="button" [class.on]="action === 'restock'" (click)="action = 'restock'">Restock (new arrival)</button>
+    <button type="button" [class.on]="action === 'adjust'" (click)="action = 'adjust'">Adjust (damage / audit)</button>
+    <button type="button" [class.on]="action === 'transfer'" (click)="action = 'transfer'">Transfer between outlets</button>
+  </div>
+  @if (message()) { <div class="alert ok">{{ message() }}</div> }
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+  <div class="form-row">
+    <div><label for="prod">Product</label>
+      <select id="prod" name="product" [(ngModel)]="f.product_id"><option [ngValue]="null">Select…</option>
+        @for (p of products(); track p.id) { <option [ngValue]="p.id">{{ p.sku }} — {{ p.name }}</option> }</select></div>
+    <div><label for="out">{{ action === 'transfer' ? 'From outlet' : 'Outlet' }}</label>
+      <select id="out" name="outlet" [(ngModel)]="f.outlet_id"><option [ngValue]="null">Select…</option>
+        @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+    @if (action === 'transfer') {
+      <div><label for="to">To outlet</label>
+        <select id="to" name="to" [(ngModel)]="f.to_outlet_id"><option [ngValue]="null">Select…</option>
+          @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+    }
+    <div><label for="qty">{{ action === 'adjust' ? 'Change (+/−)' : 'Quantity' }}</label>
+      <input id="qty" name="qty" type="number" [(ngModel)]="f.quantity" /></div>
+    <div><label for="note">Note</label><input id="note" name="note" [(ngModel)]="f.note" placeholder="e.g. Invoice #123" /></div>
+    <div><button class="btn full" type="submit">Update stock</button></div>
+  </div>
+</form>
+
+<div class="views mt">
+  <button class="btn sm" [class.secondary]="view() !== 'outlet'" (click)="view.set('outlet')">By outlet</button>
+  <button class="btn sm" [class.secondary]="view() !== 'collective'" (click)="view.set('collective')">Collective (all outlets)</button>
+  <button class="btn sm" [class.secondary]="view() !== 'log'" (click)="view.set('log')">Stock movement log</button>
+</div>
+
+@switch (view()) {
+  @case ('outlet') {
+    <div class="card table-wrap mt">
+      <div class="form-row toolbar">
+        <div><label for="flt">Outlet</label>
+          <select id="flt" [(ngModel)]="outletFilter" (ngModelChange)="refresh()"><option [ngValue]="null">All outlets</option>
+            @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+        <label class="chk"><input type="checkbox" [checked]="lowOnly()" (change)="lowOnly.set(!lowOnly())" /> Low stock only</label>
+      </div>
+      <table>
+        <thead><tr><th>SKU</th><th>Product</th><th>Outlet</th><th class="right">Quantity</th><th class="right">Reorder at</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          @for (r of shownRows(); track r.product_id + '-' + r.outlet_id) {
+            <tr [class.low]="r.low_stock">
+              <td>{{ r.sku }}</td><td>{{ r.product_name }}</td><td>{{ r.outlet_name }}</td>
+              <td class="right"><strong>{{ r.quantity }}</strong></td><td class="right">{{ r.reorder_level }}</td>
+              <td><span class="badge" [class.warning]="r.low_stock" [class.success]="!r.low_stock">{{ r.low_stock ? 'Low' : 'OK' }}</span></td>
+              <td><button class="btn secondary sm" (click)="pick(r)">Select</button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  @case ('collective') {
+    @if (summary(); as s) {
+      <div class="grid stats mt">
+        @for (o of s.outlets; track o.outlet_id) {
+          <div class="card stat"><div class="label">{{ o.outlet_name }}</div><div class="value">{{ o.total_units | number }} units</div>
+            <div class="muted">{{ o.stock_value | currency: 'INR' : 'symbol' : '1.0-0' }} value</div></div>
+        }
+      </div>
+      <div class="card table-wrap mt">
+        <table>
+          <thead><tr><th>SKU</th><th>Product</th><th class="right">Total across outlets</th><th class="right">Stock value</th></tr></thead>
+          <tbody>
+            @for (p of s.products; track p.product_id) {
+              <tr><td>{{ p.sku }}</td><td>{{ p.product_name }}</td><td class="right"><strong>{{ p.total_quantity }}</strong></td><td class="right">{{ p.stock_value | currency: 'INR' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+  @case ('log') {
+    <div class="card table-wrap mt">
+      <table>
+        <thead><tr><th>When</th><th>Type</th><th>Product</th><th>Outlet</th><th class="right">Change</th><th>Note / order</th></tr></thead>
+        <tbody>
+          @for (m of movements(); track m.id) {
+            <tr><td>{{ m.created_at | date: 'short' }}</td><td><span class="badge">{{ m.movement_type }}</span></td>
+              <td>{{ m.product.name }}</td><td>{{ m.outlet.name }}</td>
+              <td class="right" [class.pos]="m.change > 0" [class.neg]="m.change < 0">{{ m.change > 0 ? '+' : '' }}{{ m.change }}</td>
+              <td class="muted">{{ m.note }}{{ m.order_id ? ' Order #' + m.order_id : '' }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

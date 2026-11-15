@@ -1,0 +1,6 @@
+.layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start;
+  @media (max-width: 800px) { grid-template-columns: 1fr; } }
+.qty { width: 70px; }
+.line { display: flex; justify-content: space-between; padding: 6px 0; }
+.total { font-weight: 700; font-size: 18px; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+.full { width: 100%; }

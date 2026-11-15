@@ -1,0 +1,46 @@
+<div class="page-head">
+  <div><h1>Products</h1><p class="muted">Catalogue shared by all outlets. Stock is managed on the Inventory page.</p></div>
+  <button class="btn" (click)="newProduct()">+ New product</button>
+</div>
+@if (message()) { <div class="alert ok">{{ message() }}</div> }
+@if (showForm()) {
+  <form class="card mb" [formGroup]="form" (ngSubmit)="save()">
+    <h2>{{ editingId() ? 'Edit product' : 'New product' }}</h2>
+    @if (error()) { <div class="alert error">{{ error() }}</div> }
+    <div class="form-row">
+      <div class="field"><label for="sku">SKU</label><input id="sku" formControlName="sku" /></div>
+      <div class="field"><label for="pname">Name</label><input id="pname" formControlName="name" /></div>
+      <div class="field"><label for="price">Price (₹)</label><input id="price" type="number" min="0" formControlName="price" /></div>
+      <div class="field"><label for="reorder">Reorder level</label><input id="reorder" type="number" min="0" formControlName="reorder_level" /></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="cat">Category</label>
+        <select id="cat" formControlName="category_id"><option [ngValue]="null">—</option>
+          @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }</select></div>
+      <div class="field"><label for="sup">Supplier</label>
+        <select id="sup" formControlName="supplier_id"><option [ngValue]="null">—</option>
+          @for (s of suppliers(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }</select></div>
+      <div class="field"><label for="img">Image URL</label><input id="img" formControlName="image_url" /></div>
+      <div class="field check"><label><input type="checkbox" formControlName="is_active" /> Visible in shop</label></div>
+    </div>
+    <div class="field"><label for="desc">Description</label><textarea id="desc" rows="2" formControlName="description"></textarea></div>
+    <div class="actions"><button class="btn" type="submit" [disabled]="form.invalid">Save</button>
+      <button class="btn secondary" type="button" (click)="showForm.set(false)">Cancel</button></div>
+  </form>
+}
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Supplier</th><th class="right">Price</th><th class="right">Total stock</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      @for (p of products(); track p.id) {
+        <tr>
+          <td>{{ p.sku }}</td><td><strong>{{ p.name }}</strong></td><td>{{ p.category?.name }}</td><td>{{ p.supplier?.name }}</td>
+          <td class="right">{{ p.price | currency: 'INR' }}</td><td class="right">{{ p.total_stock }}</td>
+          <td><span class="badge" [class.success]="p.is_active">{{ p.is_active ? 'Active' : 'Hidden' }}</span></td>
+          <td class="actions"><button class="btn secondary sm" (click)="edit(p)">Edit</button>
+            @if (p.is_active) { <button class="btn secondary sm" (click)="deactivate(p)">Hide</button> }</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

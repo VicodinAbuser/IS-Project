@@ -1,0 +1,10 @@
+.products { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.product { padding: 0; overflow: hidden; display: flex; flex-direction: column;
+  img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #eef0f4; }
+  .body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; }
+  h2 { font-size: 16px; margin: 2px 0 4px; }
+  .sku { font-size: 12px; }
+  .desc { font-size: 13px; flex: 1; margin: 0 0 12px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .price { font-size: 18px; } }
+.full { width: 100%; }
