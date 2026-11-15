@@ -38,13 +38,16 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 ## How to run
 
 You need:
-- **Oracle AI Database 26ai** (the Free edition is fine) and **Oracle SQL Developer**
+- **Oracle AI Database 26ai Free**, installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases)
 - **Python 3.10+**
 - **Node.js 18+**
 
+Oracle runs **locally on your laptop**; nothing is in the cloud.
+**First time? Follow the full step-by-step guide with troubleshooting: [docs/ORACLE_SETUP.md](docs/ORACLE_SETUP.md).**
+
 ### 1. Database (one-time, in SQL Developer)
-1. Connect as **SYSTEM** to the pluggable database. Host `localhost`, port `1521`, **Service name** `FREEPDB1`.
-2. Open `database/00_create_user.sql` and run it as a script (**F5**). This creates the `INVENTORY` user, plus `INVENTORY_TEST` for automated tests.
+1. Connect as **SYSTEM**. Host `localhost`, port `1521`, **Service name** `FREEPDB1`.
+2. Open `database/00_create_user.sql` and run it as a script (**F5**). This creates the `INVENTORY` user, plus `INVENTORY_TEST` for automated tests. It's safe to run again.
 3. Create a new connection as **INVENTORY** / `inventory123`, with the same host, port and service.
 4. In that connection, run these files in order with **F5**:
 
@@ -56,12 +59,7 @@ You need:
 
 Shortcut for step 4: after step 3 of the backend setup below, `python setup_db.py` runs the same three files for you.
 
-If your service name or password is different, create `backend/.env`:
-```
-ORACLE_DSN=localhost:1521/FREEPDB1
-ORACLE_USER=inventory
-ORACLE_PASSWORD=inventory123
-```
+If your port, service name or password is different, copy `backend/.env.example` to `backend/.env` and edit it.
 
 ### 2. Backend (port 8000)
 ```bash
