@@ -2,20 +2,23 @@
 -- 01_schema.sql  -  Tables, constraints and indexes
 -- Run as INVENTORY. Safe to re-run: it drops and recreates every table
 -- (this DELETES all data, so run 03_seed_data.sql afterwards).
--- Requires Oracle 23ai / 26ai (uses DROP TABLE IF EXISTS).
+-- Works on Oracle 19c, 21c, 23ai and 26ai.
 -- =====================================================================
 
-DROP TABLE IF EXISTS stock_movements CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS deliveries      CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS payments        CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS order_items     CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS orders          CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS inventory       CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS products        CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS suppliers       CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS categories      CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS outlets         CASCADE CONSTRAINTS PURGE;
-DROP TABLE IF EXISTS app_users       CASCADE CONSTRAINTS PURGE;
+-- Drop the old tables if they exist (children first). ORA-00942 = "table does not exist", ignored.
+BEGIN
+  FOR t IN (SELECT column_value AS name FROM TABLE(sys.odcivarchar2list(
+              'STOCK_MOVEMENTS', 'DELIVERIES', 'PAYMENTS', 'ORDER_ITEMS', 'ORDERS', 'INVENTORY',
+              'PRODUCTS', 'SUPPLIERS', 'CATEGORIES', 'OUTLETS', 'APP_USERS'))) LOOP
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE ' || t.name || ' CASCADE CONSTRAINTS PURGE';
+    EXCEPTION
+      WHEN OTHERS THEN
+        IF SQLCODE <> -942 THEN RAISE; END IF;
+    END;
+  END LOOP;
+END;
+/
 
 -- ---------- People & places ----------
 CREATE TABLE app_users (

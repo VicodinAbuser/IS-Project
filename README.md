@@ -6,7 +6,7 @@ An Information Systems course project built as a **3-tier web application**.
 |---|---|---|
 | Presentation (UI) | Angular 19 (TypeScript, SCSS, Chart.js) | `frontend/` |
 | Application | Python FastAPI (REST API, JWT security) | `backend/app/` |
-| Data + business rules | **Oracle AI Database 26ai**: tables, PL/SQL package `INVENTORY_PKG`, trigger, views | `database/` |
+| Data + business rules | **Oracle Database** (26ai Free or 21c): tables, PL/SQL package `INVENTORY_PKG`, trigger, views | `database/` |
 
 ```mermaid
 flowchart LR
@@ -42,7 +42,7 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 > *For developers:* the code is edited in `backend/`, `frontend/` and `database/`. After changing it, run `python tools/build_run_local.py` to refresh `run-local/` and `run-local.zip`.
 
 You need:
-- **Oracle AI Database 26ai Free**, installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases)
+- **Oracle AI Database 26ai Free** *or* **Oracle Database 21c** (both tested), installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases). No environment variables needed.
 - **Python 3.10+**
 - **Node.js 18+**
 
@@ -50,7 +50,7 @@ Oracle runs **locally on your laptop**; nothing is in the cloud.
 **First time? Follow the full step-by-step guide with troubleshooting: [docs/ORACLE_SETUP.md](docs/ORACLE_SETUP.md).**
 
 ### 1. Database (one-time, in SQL Developer)
-1. Connect as **SYSTEM**. Host `localhost`, port `1521`, **Service name** `FREEPDB1`.
+1. Connect as **SYSTEM**. Host `localhost`, port `1521`, **Service name** `FREEPDB1` (26ai) or `ORCLPDB` (21c).
 2. Open `database/00_create_user.sql` and run it as a script (**F5**). This creates the `INVENTORY` user, plus `INVENTORY_TEST` for automated tests. It's safe to run again.
 3. Create a new connection as **INVENTORY** / `inventory123`, with the same host, port and service.
 4. In that connection, run these files in order with **F5**:
@@ -230,7 +230,7 @@ frontend/src/
 ## Viva / Q&A preparation
 
 **How is the database connected to the backend?**
-`app/database.py` uses **python-oracledb**, Oracle's official Python driver. In its "thin" mode no Oracle Client install is needed. When the server starts, it opens a **connection pool** to `localhost:1521/FREEPDB1` as user `INVENTORY`. Each API request borrows one connection through FastAPI's dependency injection (`Depends(get_db)`) and returns it afterwards.
+`app/database.py` uses **python-oracledb**, Oracle's official Python driver. In its "thin" mode no Oracle Client install is needed. When the server starts, it opens a **connection pool** to `localhost:1521/FREEPDB1` (or `ORCLPDB` on 21c, from `backend/.env`) as user `INVENTORY`. Each API request borrows one connection through FastAPI's dependency injection (`Depends(get_db)`) and returns it afterwards.
 - **Reads** are plain SQL `SELECT`s, mostly on the views. For example, `SELECT * FROM v_inventory_status WHERE outlet_id = :outlet_id`.
 - **Writes** call the PL/SQL package, e.g. `cursor.callproc("inventory_pkg.restock", keyword_parameters={...})`.
 - All values are passed as **bind variables** (`:name`), never pasted into the SQL text. This prevents SQL injection and lets Oracle reuse execution plans.

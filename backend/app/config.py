@@ -3,8 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Oracle connection. DSN format is host:port/service_name.
-    # Oracle AI Database 26ai Free uses the pluggable database FREEPDB1.
+    # Oracle connection. DSN format is host:port/service_name (the PLUGGABLE database).
+    #   Oracle 26ai Free: localhost:1521/FREEPDB1   Oracle 21c: usually localhost:1521/ORCLPDB
+    # setup_db.py --create-user asks for it and saves it in backend/.env.
     oracle_user: str = "inventory"
     oracle_password: str = "inventory123"
     oracle_dsn: str = "localhost:1521/FREEPDB1"

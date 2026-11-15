@@ -166,7 +166,7 @@ def test_survives_package_recompile(client):
 
 def test_health_checks_oracle(client):
     r = client.get("/api/health")
-    assert r.status_code == 200 and r.json()["oracle_version"].startswith("23.")
+    assert r.status_code == 200 and r.json()["oracle_version"][:2].isdigit()
 
 
 # ---------------------------------------------------------------- edge cases

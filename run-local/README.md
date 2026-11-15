@@ -45,8 +45,8 @@ run-local/
 
 | Software | Notes |
 |---|---|
-| **Oracle AI Database 26ai Free** (Windows) | Write down the **password** you choose during install (the SYSTEM password). See [ORACLE_SETUP.md](ORACLE_SETUP.md) steps 1–2. |
-| **Oracle SQL Developer** | Windows 64-bit **with JDK included**. Just unzip and run `sqldeveloper.exe`. |
+| **Oracle AI Database 26ai Free** *or* **Oracle Database 21c** (`WINDOWS.X64_213000_db_home.zip`) | Write down the **password** you choose during install (the SYSTEM password). Install steps for both: [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A. |
+| **Oracle SQL Developer** | 21c usually includes it (`sqldeveloper` folder inside the Oracle folder). Otherwise download the Windows 64-bit version **with JDK included**, unzip it and run `sqldeveloper.exe`. |
 | **Python 3.10+** from python.org | On the first installer screen, tick **"Add python.exe to PATH"**. |
 | **Node.js 18+ (LTS)** from nodejs.org | Click Next through the installer. |
 
@@ -63,13 +63,21 @@ Right-click the zip → **Extract All…**, to for example `C:\IS-Project`. You 
 This installs the Python packages (backend) and Node packages (website). It takes about 3–10 minutes. It should end with **"Install finished"**.
 
 ### Step 4: Double-click `run-local\2-setup-database.bat`
-Type your Oracle **SYSTEM password** when asked. Nothing appears while you type; that's normal. It creates:
+It asks three things:
+```
+Service name [FREEPDB1]:   ← press Enter for Oracle 26ai Free, or type ORCLPDB for Oracle 21c
+Port [1521]:               ← press Enter
+Oracle SYSTEM password:    ← the password from the Oracle install (nothing appears while you type)
+```
+It creates:
 - the `INVENTORY` database user (password `inventory123`)
 - all tables, the PL/SQL package `INVENTORY_PKG`, the trigger and the views
 - demo data, ending with `Seeded: 13 products, 4 outlets, 260 orders`
 
+It also saves your service name in `backend\.env`, so the app connects to the same database. You don't need to set any environment variables.
+
 ### Step 5: Connect SQL Developer (for showing the database)
-New connection: **Username** `inventory`, **Password** `inventory123`, **Hostname** `localhost`, **Port** `1521`, **Service name** `FREEPDB1`.
+New connection: **Username** `inventory`, **Password** `inventory123`, **Hostname** `localhost`, **Port** `1521`, **Service name** `FREEPDB1` (26ai) or `ORCLPDB` (21c).
 Expand it to see **Tables**, **Views**, **Packages** and **Triggers**.
 
 ---
@@ -133,6 +141,8 @@ Then open http://localhost:4200.
 | `[X] Python was not found` | Reinstall Python and tick **"Add python.exe to PATH"**, then open a new window |
 | `Could not log in as SYSTEM ... ORA-01017` | Wrong SYSTEM password. Use the one from the Oracle install. |
 | `Could not connect ... DPY-6005` or `ORA-12541` | Oracle isn't running. Open **Services** (Win+R → `services.msc`) and start the services whose names begin with **Oracle**. |
+| `ORA-12514` (service not registered) | Wrong service name. Run `2-setup-database.bat` again: `FREEPDB1` for 26ai, `ORCLPDB` for 21c. |
+| `ORA-01109: database not open` (21c) | See [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A, Option 2, step 6 |
 | Website says *Cannot reach the backend* | The Backend window was closed or shows an error. Run `3-start-backend.bat`. |
 | Website says *Cannot connect to the Oracle database* | Backend is fine but Oracle isn't running (see above) |
 | Login page **Test** shows *backend up, Oracle not reachable* | Same: start Oracle |
