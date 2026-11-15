@@ -92,6 +92,9 @@ cd backend && pytest -q        # API tests on a real Oracle DB (uses the INVENTO
 cd frontend && npm test        # Angular unit tests (*.spec.ts)
 ```
 
+### Optional: put the website online with Vercel
+The Angular site can be hosted on Vercel while the backend and Oracle stay on your laptop, reached through a free tunnel. See **[docs/DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md)**.
+
 ## Presentation demo with SQL Developer
 Open `database/04_demo_queries.sql` while the website is running. It walks through:
 1. Showing every table, view, package and trigger, all VALID

@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { apiUrl } from './api-config';
 import {
   Category, Dashboard, DeliveryStatus, InventoryRow, Order, Outlet, Product, ProductInput,
   QuarterlyReport, StockMovement, Supplier,
@@ -11,7 +11,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
-  private base = environment.apiUrl;
+  private get base() { return apiUrl(); }
 
   private params(obj: Record<string, unknown>): HttpParams {
     let p = new HttpParams();
@@ -78,7 +78,7 @@ export class ApiService {
 /** Turns a backend error into a readable message for the UI. */
 export function errorMessage(err: unknown): string {
   if (err instanceof HttpErrorResponse) {
-    if (err.status === 0) return 'Cannot reach the server. Is the backend running on port 8000?';
+    if (err.status === 0) return `Cannot reach the backend at ${apiUrl()}. Is the backend (and tunnel) running?`;
     const d = err.error?.detail;
     if (typeof d === 'string') return d;
     if (Array.isArray(d)) return d.map((x: any) => `${x.loc?.slice(-1)[0]}: ${x.msg}`).join(', ');

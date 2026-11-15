@@ -13,4 +13,24 @@
     <button class="btn secondary sm" type="button" (click)="fillDemo('customer')">Customer</button>
   </div>
   <p class="muted">New customer? <a routerLink="/register">Create an account</a></p>
+  <div class="server">
+    @if (editingServer()) {
+      <label for="srv">Backend address (e.g. https://abc.trycloudflare.com)</label>
+      <div class="row">
+        <input id="srv" [(ngModel)]="serverInput" placeholder="https://…" (keyup.enter)="saveServer()" />
+        <button class="btn sm" type="button" (click)="saveServer()">Save</button>
+      </div>
+      <button class="link" type="button" (click)="saveServer(true)">Use default (localhost:8000)</button>
+    } @else {
+      <span class="muted">Backend: <code>{{ server() }}</code></span>
+      @switch (serverStatus()) {
+        @case ('checking') { <span class="badge">checking…</span> }
+        @case ('ok') { <span class="badge success">connected to Oracle</span> }
+        @case ('nodb') { <span class="badge warning">backend up, Oracle not reachable</span> }
+        @case ('fail') { <span class="badge danger">backend not reachable</span> }
+      }
+      <span class="links"><button class="link" type="button" (click)="testServer()">Test</button>
+        <button class="link" type="button" (click)="editServer()">Change</button></span>
+    }
+  </div>
 </div>

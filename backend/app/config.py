@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-this-secret-in-production"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 120
+    # Browser origins allowed to call this API: the local Angular dev server, plus any
+    # Vercel deployment (https://<anything>.vercel.app). Add your own domain here if you use one.
     cors_origins: list[str] = ["http://localhost:4200"]
+    cors_origin_regex: str = r"https://.*\.vercel\.app"
 
     model_config = SettingsConfigDict(env_file=".env")
 

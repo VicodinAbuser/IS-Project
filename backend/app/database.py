@@ -109,6 +109,8 @@ ORA_TO_HTTP = {20001: 409, 20004: 404, 20009: 409, 20022: 422,
 
 def oracle_error_to_http(exc: oracledb.DatabaseError) -> HTTPException | None:
     err = exc.args[0]
+    if isinstance(exc, oracledb.OperationalError) or str(getattr(err, "full_code", "")).startswith("DPY-6"):
+        return HTTPException(503, "Cannot connect to the Oracle database. Is Oracle running on the laptop?")
     status = ORA_TO_HTTP.get(getattr(err, "code", None))
     if status is None:
         return None

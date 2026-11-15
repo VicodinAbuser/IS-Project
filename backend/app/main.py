@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .database import close_pool, init_pool, oracle_error_to_http
+from .database import close_pool, get_db, init_pool, oracle_error_to_http, query_one
 from .routers import auth, catalog, inventory, orders, reports
 
 
@@ -25,8 +25,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow the Angular dev server (a different origin) to call this API from the browser.
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
+# Allow the Angular site (local dev server or Vercel) to call this API from the browser.
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
+                   allow_origin_regex=settings.cors_origin_regex, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["Content-Disposition"])
 
 
@@ -45,4 +46,15 @@ for r in (auth, catalog, inventory, orders, reports):
 
 @app.get("/api/health", tags=["Health"])
 def health():
-    return {"status": "ok", "database": settings.oracle_dsn}
+    """Checks the whole chain: this API is up AND Oracle answers a query."""
+    session = get_db()
+    try:
+        conn = next(session)
+        db_version = query_one(conn, "SELECT version_full FROM product_component_version WHERE ROWNUM = 1")
+    except oracledb.Error as exc:
+        return JSONResponse(status_code=503, content={
+            "status": "error", "database": settings.oracle_dsn,
+            "detail": f"API is running but cannot reach Oracle: {str(exc).splitlines()[0]}"})
+    finally:
+        session.close()
+    return {"status": "ok", "database": settings.oracle_dsn, "oracle_version": db_version["version_full"]}

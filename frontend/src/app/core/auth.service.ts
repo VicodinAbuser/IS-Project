@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { apiUrl } from './api-config';
 import { AuthResponse, User } from './models';
 
 const TOKEN_KEY = 'ims_token';
@@ -23,12 +23,12 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, { email, password })
+    return this.http.post<AuthResponse>(`${apiUrl()}/auth/login`, { email, password })
       .pipe(tap(res => this.store(res)));
   }
 
   register(data: { name: string; email: string; password: string; phone?: string; address?: string }) {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, data)
+    return this.http.post<AuthResponse>(`${apiUrl()}/auth/register`, data)
       .pipe(tap(res => this.store(res)));
   }
 

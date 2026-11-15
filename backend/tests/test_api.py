@@ -162,3 +162,8 @@ def test_survives_package_recompile(client):
     r = client.post("/api/inventory/restock", json={"product_id": product["id"], "outlet_id": outlet["id"],
                                                     "quantity": 5}, headers=admin)
     assert r.status_code == 200 and r.json()["quantity"] == 15
+
+
+def test_health_checks_oracle(client):
+    r = client.get("/api/health")
+    assert r.status_code == 200 and r.json()["oracle_version"].startswith("23.")
