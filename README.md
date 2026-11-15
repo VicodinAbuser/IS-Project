@@ -37,6 +37,8 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 
 ## How to run
 
+> **Easiest way (Windows):** use the double-click scripts and guide in **[run-local/](run-local/README.md)**: install once, then `START-APP.bat` every time.
+
 You need:
 - **Oracle AI Database 26ai Free**, installed on the laptop, and **Oracle SQL Developer** (Oracle's tool; MySQL Workbench can't open Oracle databases)
 - **Python 3.10+**
@@ -57,7 +59,7 @@ Oracle runs **locally on your laptop**; nothing is in the cloud.
 | `database/02_inventory_pkg.sql` | PL/SQL package `INVENTORY_PKG`, trigger `TRG_INVENTORY_AUDIT`, 4 views |
 | `database/03_seed_data.sql` | Demo data: 13 products, 4 outlets, about 260 orders over two years |
 
-Shortcut for step 4: after step 3 of the backend setup below, `python setup_db.py` runs the same three files for you.
+Shortcut: after installing the backend packages (below), `python setup_db.py --create-user` does steps 2–4 for you. It asks for the SYSTEM password.
 
 If your port, service name or password is different, copy `backend/.env.example` to `backend/.env` and edit it.
 

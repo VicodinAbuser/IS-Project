@@ -2,6 +2,8 @@
 
 Do this **once** on the laptop you'll use for the demo. It takes about 30–45 minutes.
 
+> Prefer double-click scripts? After steps 1–2 below, follow [run-local/README.md](../run-local/README.md) instead; it automates steps 3–6.
+
 > **SQL Developer is Oracle's tool.** MySQL Workbench cannot open an Oracle database.
 
 ## What you need

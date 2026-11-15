@@ -1,11 +1,13 @@
 """Run the SQL scripts in ../database against Oracle, in order.
 
-    python setup_db.py            # tables + package + views + demo data
-    python setup_db.py --no-seed  # tables + package + views only
+    python setup_db.py --create-user  # first time only: also creates the INVENTORY user (asks for SYSTEM password)
+    python setup_db.py                # tables + package + views + demo data
+    python setup_db.py --no-seed      # tables + package + views only
 
 You can also run the same .sql files yourself in SQL Developer (open the file, press F5).
 Connection details come from .env / environment variables (see app/config.py).
 """
+import getpass
 import sys
 from pathlib import Path
 
@@ -63,11 +65,30 @@ def run_file(conn, path: Path):
     conn.commit()
 
 
+def create_user():
+    """Runs 00_create_user.sql as SYSTEM (the password you chose when installing Oracle)."""
+    password = getpass.getpass("Oracle SYSTEM password (the one you chose when installing Oracle): ")
+    try:
+        conn = oracledb.connect(user="system", password=password, dsn=settings.oracle_dsn)
+    except oracledb.Error as exc:
+        raise SystemExit(f"Could not log in as SYSTEM at {settings.oracle_dsn}: {str(exc).splitlines()[0]}")
+    try:
+        run_file(conn, SQL_DIR / "00_create_user.sql")
+    finally:
+        conn.close()
+
+
 def main():
+    if "--create-user" in sys.argv:
+        create_user()
     files = ["01_schema.sql", "02_inventory_pkg.sql"]
     if "--no-seed" not in sys.argv:
         files.append("03_seed_data.sql")
-    conn = oracledb.connect(user=settings.oracle_user, password=settings.oracle_password, dsn=settings.oracle_dsn)
+    try:
+        conn = oracledb.connect(user=settings.oracle_user, password=settings.oracle_password, dsn=settings.oracle_dsn)
+    except oracledb.Error as exc:
+        raise SystemExit(f"Could not connect as {settings.oracle_user} at {settings.oracle_dsn}: "
+                         f"{str(exc).splitlines()[0]}\nIs Oracle running? First time? Use: python setup_db.py --create-user")
     try:
         for name in files:
             run_file(conn, SQL_DIR / name)
