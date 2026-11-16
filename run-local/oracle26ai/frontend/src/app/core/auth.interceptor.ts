@@ -1,23 +1,26 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
-import { apiUrl } from './api-config';
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
-/** Adds "Authorization: Bearer <token>" to API calls and logs out on 401 (expired token). */
+/**
+ * Runs for every request to the backend API:
+ *  - adds "X-Requested-With: XMLHttpRequest". The backend refuses data changes without it,
+ *    because another website can't add this header to a request it forges (CSRF protection).
+ *  - adds "ngrok-skip-browser-warning", so the free ngrok tunnel answers the API directly.
+ * The login cookie is attached by the browser itself (same address, HttpOnly), not by this code.
+ * A 401 answer means the session ended: the user is sent back to the login page.
+ */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  if (!req.url.startsWith(environment.apiUrl)) return next(req);
   const auth = inject(AuthService);
-  const token = auth.token;
-  if (!req.url.startsWith(apiUrl())) return next(req);
-  const headers: Record<string, string> = {
-    // Lets API calls pass through an ngrok tunnel without its browser warning page.
-    'ngrok-skip-browser-warning': 'true',
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const authReq = req.clone({ setHeaders: headers });
-  return next(authReq).pipe(
+  const apiReq = req.clone({
+    setHeaders: { 'X-Requested-With': 'XMLHttpRequest', 'ngrok-skip-browser-warning': 'true' },
+  });
+  return next(apiReq).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && token) auth.logout();
+      if (err.status === 401 && !req.url.includes('/auth/')) auth.sessionExpired();
       return throwError(() => err);
     }),
   );

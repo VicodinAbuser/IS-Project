@@ -70,22 +70,65 @@ def check_fk(rows, col, parent, table, nullable=False):
 
 
 print(f"Checking {FOLDER}")
-users = load("app_users"); outlets = load("outlets"); categories = load("categories"); suppliers = load("suppliers")
+users = load("users"); outlets = load("outlets"); categories = load("categories"); suppliers = load("suppliers")
+cprofiles = load("customer_profiles"); profiles = load("profiles"); permissions = load("permissions")
+authz = load("authorizations"); uprofiles = load("user_profiles")
 products = load("products"); inventory = load("inventory"); orders = load("orders"); items = load("order_items")
 payments = load("payments"); deliveries = load("deliveries"); moves = load("stock_movements")
 
 # ---------------------------------------------------------------- schema constraints
-U = check_pk(users, "user_id", "app_users")
-check_not_null(users, ["full_name", "email", "password_hash", "user_role", "created_at"], "app_users")
-check_unique(users, ["email"], "app_users")
-check_len(users, {"full_name": 100, "email": 255, "password_hash": 255, "user_role": 10, "phone": 20, "address": 500}, "app_users")
-if {r["user_role"] for r in users} - {"ADMIN", "CUSTOMER"}:
-    bad("app_users.user_role outside ('ADMIN','CUSTOMER')")
-n_customers = sum(r["user_role"] == "CUSTOMER" for r in users)
-if n_customers != 50_000:
-    bad(f"expected 50,000 customers, found {n_customers:,}")
+U = check_pk(users, "user_id", "users")
+check_not_null(users, ["full_name", "email", "password_hash", "account_status", "failed_login_count", "created_at",
+                       "updated_at"], "users")
+check_unique(users, ["email"], "users")
+check_len(users, {"full_name": 100, "email": 255, "password_hash": 255, "account_status": 10}, "users")
+if any(r["email"] != r["email"].lower() for r in users):
+    bad("users.email must be lower case (CHECK ck_users_email_lower)")
+if {r["account_status"] for r in users} - {"ACTIVE", "DISABLED"}:
+    bad("users.account_status outside ('ACTIVE','DISABLED')")
+if any(int(r["failed_login_count"]) < 0 for r in users):
+    bad("users.failed_login_count < 0")
 if any(not r["password_hash"].startswith("$2b$") for r in users):
-    bad("app_users.password_hash is not a bcrypt hash")
+    bad("users.password_hash is not a bcrypt hash")
+
+# access control: profiles, permissions, the authorization matrix and each user's profiles
+PR = check_pk(profiles, "profile_id", "profiles"); check_unique(profiles, ["profile_code"], "profiles")
+PE = check_pk(permissions, "permission_id", "permissions"); check_unique(permissions, ["permission_code"], "permissions")
+if {r["module"] for r in permissions} - {"CATALOG", "ORDERS", "INVENTORY", "REPORTS", "USERS"}:
+    bad("permissions.module outside the allowed values")
+if {r["access_type"] for r in permissions} - {"READ", "WRITE", "REPORT", "DOWNLOAD", "ADMIN"}:
+    bad("permissions.access_type outside the allowed values")
+check_unique(authz, ["profile_id", "permission_id"], "authorizations")
+check_fk(authz, "profile_id", PR, "authorizations"); check_fk(authz, "permission_id", PE, "authorizations")
+check_fk(authz, "granted_by", U, "authorizations", nullable=True)
+check_unique(uprofiles, ["user_id", "profile_id"], "user_profiles")
+check_fk(uprofiles, "user_id", U, "user_profiles"); check_fk(uprofiles, "profile_id", PR, "user_profiles")
+check_fk(uprofiles, "assigned_by", U, "user_profiles", nullable=True)
+code_of = {int(r["profile_id"]): r["profile_code"] for r in profiles}
+perm_code = {int(r["permission_id"]): r["permission_code"] for r in permissions}
+grants = defaultdict(set)
+for a in authz:
+    grants[code_of[int(a["profile_id"])]].add(perm_code[int(a["permission_id"])])
+user_codes = defaultdict(set)
+for up in uprofiles:
+    user_codes[int(up["user_id"])].add(code_of[int(up["profile_id"])])
+user_perms = {uid: set().union(*(grants[c] for c in codes)) for uid, codes in user_codes.items()}
+if set(U) - set(user_codes):
+    bad(f"{len(set(U) - set(user_codes))} users have no profile")
+customers = {uid for uid, codes in user_codes.items() if "CUSTOMER" in codes}
+if len(customers) != 50_000:
+    bad(f"expected 50,000 customers, found {len(customers):,}")
+if grants["CUSTOMER"] != {"CATALOG_READ", "ORDER_PLACE", "ORDER_READ_OWN"} or len(grants["ADMIN"]) != len(permissions):
+    bad("the authorization matrix differs from 01_schema.sql")
+
+CP = check_pk(cprofiles, "customer_id", "customer_profiles")
+check_fk(cprofiles, "customer_id", U, "customer_profiles")
+check_unique(cprofiles, ["phone"], "customer_profiles", allow_null=True)
+check_len(cprofiles, {"phone": 20, "address_line": 300, "city": 100, "state": 100, "pincode": 10}, "customer_profiles")
+if any(r["pincode"] and not (len(r["pincode"]) == 6 and r["pincode"].isdigit()) for r in cprofiles):
+    bad("customer_profiles.pincode is not 6 digits (CHECK ck_custprof_pincode)")
+if set(CP) != customers:
+    bad("customer_profiles must have exactly one row per CUSTOMER user")
 
 O = check_pk(outlets, "outlet_id", "outlets")
 check_not_null(outlets, ["name", "city"], "outlets"); check_unique(outlets, ["name"], "outlets")
@@ -95,11 +138,12 @@ S = check_pk(suppliers, "supplier_id", "suppliers"); check_unique(suppliers, ["n
 check_len(suppliers, {"name": 150, "contact_email": 255, "phone": 20}, "suppliers")
 
 P = check_pk(products, "product_id", "products")
-check_not_null(products, ["sku", "name", "price", "reorder_level", "is_active", "created_at"], "products")
+check_not_null(products, ["sku", "name", "price", "reorder_level", "is_active", "created_at", "updated_at"], "products")
 check_unique(products, ["sku"], "products")
 check_len(products, {"sku": 50, "name": 150, "description": 1000, "image_url": 500}, "products")
 check_fk(products, "category_id", C, "products", nullable=True)
 check_fk(products, "supplier_id", S, "products", nullable=True)
+check_fk(cprofiles, "preferred_outlet_id", O, "customer_profiles", nullable=True)
 for p in products:
     if Decimal(p["price"]) < 0 or int(p["reorder_level"]) < 0 or p["is_active"] not in ("0", "1"):
         bad(f"products {p['sku']}: CHECK constraint fails")
@@ -111,13 +155,14 @@ if any(int(r["quantity"]) < 0 for r in inventory):
     bad("inventory.quantity < 0")
 
 OR = check_pk(orders, "order_id", "orders")
-check_not_null(orders, ["customer_id", "outlet_id", "order_status", "total_amount", "shipping_address", "created_at"], "orders")
+check_not_null(orders, ["customer_id", "outlet_id", "order_status", "total_amount", "shipping_address", "created_at",
+                        "updated_at"], "orders")
 check_fk(orders, "customer_id", U, "orders"); check_fk(orders, "outlet_id", O, "orders")
 check_len(orders, {"shipping_address": 500}, "orders")
 if {r["order_status"] for r in orders} - {"PENDING_PAYMENT", "PAID", "CANCELLED", "RETURNED"}:
     bad("orders.order_status outside the allowed values")
-if any(U[int(r["customer_id"])]["user_role"] != "CUSTOMER" for r in orders):
-    bad("an order belongs to an ADMIN")
+if any(int(r["customer_id"]) not in customers for r in orders):
+    bad("an order belongs to a user without the CUSTOMER profile")
 
 check_pk(items, "order_item_id", "order_items")
 check_fk(items, "order_id", OR, "order_items"); check_fk(items, "product_id", P, "order_items")
@@ -148,15 +193,32 @@ if any(int(r["qty_change"]) == 0 for r in moves):
     bad("stock_movements.qty_change = 0 (the trigger never logs a zero change)")
 
 # every timestamp parses
-for table, rows, col in [("app_users", users, "created_at"), ("products", products, "created_at"),
+for table, rows, col in [("users", users, "created_at"), ("users", users, "updated_at"),
+                         ("customer_profiles", cprofiles, "created_at"), ("customer_profiles", cprofiles, "updated_at"),
+                         ("user_profiles", uprofiles, "assigned_at"), ("authorizations", authz, "granted_at"),
+                         ("products", products, "created_at"), ("products", products, "updated_at"),
+                         ("orders", orders, "updated_at"),
                          ("inventory", inventory, "updated_at"), ("orders", orders, "created_at"),
                          ("payments", payments, "updated_at"), ("deliveries", deliveries, "updated_at"),
                          ("stock_movements", moves, "created_at")]:
     for r in rows:
         r[col] = ts(r[col])
 
+for table, rows, col in [("users", users, "last_login_at")]:
+    for r in rows:
+        r[col] = ts(r[col]) if r[col] else None
+
 # ---------------------------------------------------------------- business rules
 print("  checking business rules ...")
+for u in users:
+    if u["updated_at"] < u["created_at"] or (u["last_login_at"] and u["last_login_at"] < u["created_at"]):
+        bad(f"user {u['user_id']}: updated / last login before the account was created"); break
+for r in cprofiles:
+    if r["created_at"] < U[int(r["customer_id"])]["created_at"] or r["updated_at"] < r["created_at"]:
+        bad(f"customer_profiles {r['customer_id']}: dates out of order"); break
+for p in products:
+    if p["updated_at"] < p["created_at"]:
+        bad(f"product {p['sku']}: updated before it was created")
 items_by_order = defaultdict(list)
 for it in items:
     items_by_order[int(it["order_id"])].append(it)
@@ -207,6 +269,8 @@ for o in orders:
         bad(f"order {oid}: placed before the customer signed up")
     if pay["updated_at"] < o["created_at"] or dl["updated_at"] < o["created_at"]:
         bad(f"order {oid}: payment/delivery updated before the order was placed")
+    if o["updated_at"] < max(o["created_at"], pay["updated_at"], dl["updated_at"]):
+        bad(f"order {oid}: updated_at is older than its payment/delivery change (triggers keep it the latest)")
     if not datetime(2025, 1, 1) <= o["created_at"] <= datetime(2026, 11, 15, 20):
         bad(f"order {oid}: outside the trading period 2025-01-01 .. 2026-11-15 20:00")
     if prev_created and o["created_at"] < prev_created:
@@ -241,8 +305,10 @@ for m in moves:
     if m["movement_type"] in ("SALE", "CANCEL", "RETURN") and not m["order_id"]:
         bad(f"movement {m['movement_id']}: {m['movement_type']} without an order_id")
     if m["movement_type"] in ("RESTOCK", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT"):
-        if m["order_id"] or not m["user_id"] or U[int(m["user_id"])]["user_role"] != "ADMIN":
-            bad(f"movement {m['movement_id']}: stock changes by staff need an ADMIN user and no order"); break
+        if m["order_id"] or not m["user_id"] or "STOCK_WRITE" not in user_perms.get(int(m["user_id"]), set()):
+            bad(f"movement {m['movement_id']}: stock changes by staff need a user with STOCK_WRITE and no order"); break
+    if m["movement_type"] == "RETURN" and m["user_id"] and "ORDER_MANAGE" not in user_perms.get(int(m["user_id"]), set()):
+        bad(f"movement {m['movement_id']}: a return must be accepted by staff with ORDER_MANAGE"); break
     sign_ok = {"RESTOCK": 1, "SALE": -1, "CANCEL": 1, "RETURN": 1, "TRANSFER_IN": 1, "TRANSFER_OUT": -1}
     if m["movement_type"] in sign_ok and int(m["qty_change"]) * sign_ok[m["movement_type"]] < 0:
         bad(f"movement {m['movement_id']}: {m['movement_type']} with the wrong sign")

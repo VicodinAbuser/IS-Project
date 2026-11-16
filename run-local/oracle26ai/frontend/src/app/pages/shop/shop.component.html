@@ -11,6 +11,8 @@
       <option [ngValue]="null">All categories</option>
       @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
     </select></div>
+  <div><label for="sort">Sort by</label>
+    <select id="sort" [(ngModel)]="sort" (ngModelChange)="load()">@for (s of sorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
   <div><label for="search">Search</label><input id="search" placeholder="Name or SKU" [(ngModel)]="search" (keyup.enter)="load()" (input)="load()" /></div>
 </div>
 @if (error()) { <div class="alert error mt">{{ error() }}</div> }

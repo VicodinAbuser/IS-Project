@@ -8,7 +8,7 @@ rows in the project tables with the CSV data. To go back to the small demo data,
 setup_db.py again (or 03_seed_data.sql in SQL Developer).
 
 How it works:
-  1. empties the 11 tables (children first, so foreign keys are never broken)
+  1. empties the 16 tables (children first, so foreign keys are never broken)
   2. switches the audit trigger TRG_INVENTORY_AUDIT off while loading, because the
      stock history comes from stock_movements.csv (otherwise every INVENTORY row
      inserted would also be logged as a MANUAL movement)
@@ -32,20 +32,30 @@ from setup_db import explain
 DATA_DIR = Path(__file__).resolve().parent.parent / "database" / "dataset"
 BATCH = 10_000
 
-# table -> (identity column, {column: type}); types: int, money, ts or a VARCHAR2 size
+# table -> (identity column or None, {column: type}); types: int, money, ts or a VARCHAR2 size.
+# In load order: parents before children.
 TABLES = {
-    "app_users": ("user_id", {"user_id": int, "full_name": 100, "email": 255, "password_hash": 255,
-                              "user_role": 10, "phone": 20, "address": 500, "created_at": "ts"}),
+    "users": ("user_id", {"user_id": int, "full_name": 100, "email": 255, "password_hash": 255, "account_status": 10,
+                          "failed_login_count": int, "locked_until": "ts", "last_login_at": "ts", "created_at": "ts",
+                          "updated_at": "ts"}),
     "outlets": ("outlet_id", {"outlet_id": int, "name": 100, "city": 100, "address": 500}),
+    "customer_profiles": (None, {"customer_id": int, "phone": 20, "address_line": 300, "city": 100, "state": 100,
+                                 "pincode": 10, "preferred_outlet_id": int, "created_at": "ts", "updated_at": "ts"}),
+    "profiles": ("profile_id", {"profile_id": int, "profile_code": 30, "profile_name": 100, "description": 500,
+                                "is_staff": int}),
+    "permissions": ("permission_id", {"permission_id": int, "permission_code": 30, "permission_name": 100, "module": 20,
+                                      "access_type": 10, "description": 500}),
+    "authorizations": (None, {"profile_id": int, "permission_id": int, "granted_at": "ts", "granted_by": int}),
+    "user_profiles": (None, {"user_id": int, "profile_id": int, "assigned_at": "ts", "assigned_by": int}),
     "categories": ("category_id", {"category_id": int, "name": 100}),
     "suppliers": ("supplier_id", {"supplier_id": int, "name": 150, "contact_email": 255, "phone": 20}),
     "products": ("product_id", {"product_id": int, "sku": 50, "name": 150, "description": 1000, "price": "money",
                                 "image_url": 500, "reorder_level": int, "is_active": int, "category_id": int,
-                                "supplier_id": int, "created_at": "ts"}),
+                                "supplier_id": int, "created_at": "ts", "updated_at": "ts"}),
     "inventory": ("inventory_id", {"inventory_id": int, "product_id": int, "outlet_id": int, "quantity": int,
                                    "updated_at": "ts"}),
     "orders": ("order_id", {"order_id": int, "customer_id": int, "outlet_id": int, "order_status": 20,
-                            "total_amount": "money", "shipping_address": 500, "created_at": "ts"}),
+                            "total_amount": "money", "shipping_address": 500, "created_at": "ts", "updated_at": "ts"}),
     "order_items": ("order_item_id", {"order_item_id": int, "order_id": int, "product_id": int, "quantity": int,
                                       "unit_price": "money"}),
     "payments": ("payment_id", {"payment_id": int, "order_id": int, "amount": "money", "payment_method": 30,
@@ -74,6 +84,15 @@ CHECKS = [  # (what, SQL returning the number of bad rows)
      """SELECT COUNT(*) FROM orders o
          WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.order_id)
             OR NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.order_id = o.order_id)"""),
+    ("every user has at least one profile",
+     "SELECT COUNT(*) FROM users u WHERE NOT EXISTS (SELECT 1 FROM user_profiles up WHERE up.user_id = u.user_id)"),
+    ("every customer has a customer profile",
+     """SELECT COUNT(*) FROM v_user_access a
+         WHERE a.profile_code = 'CUSTOMER' AND a.permission_code = 'ORDER_PLACE'
+           AND NOT EXISTS (SELECT 1 FROM customer_profiles c WHERE c.customer_id = a.user_id)"""),
+    ("order 'last updated' >= its payment and delivery changes",
+     """SELECT COUNT(*) FROM orders o JOIN payments p ON p.order_id = o.order_id JOIN deliveries d ON d.order_id = o.order_id
+         WHERE o.updated_at < GREATEST(p.updated_at, d.updated_at)"""),
     ("invalid database objects",
      "SELECT COUNT(*) FROM user_objects WHERE status <> 'VALID'"),
 ]
@@ -110,7 +129,7 @@ def load_table(cur, table, types):
 
 
 def main():
-    if not (DATA_DIR / "app_users.csv").exists():
+    if not (DATA_DIR / "users.csv").exists():
         raise SystemExit(f"No dataset found in {DATA_DIR}")
     print(f"This REPLACES all data in the INVENTORY tables at {settings.oracle_dsn}")
     print("with the large dataset (50,000 customers, about 89,000 orders).")
@@ -146,7 +165,8 @@ def main():
 
     print("Moving the ID counters past the loaded rows, recompiling, gathering statistics ...")
     for table, (id_col, _) in TABLES.items():
-        cur.execute(f"ALTER TABLE {table} MODIFY {id_col} GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE)")
+        if id_col:
+            cur.execute(f"ALTER TABLE {table} MODIFY {id_col} GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE)")
     cur.execute("BEGIN DBMS_UTILITY.COMPILE_SCHEMA(schema => USER, compile_all => FALSE); END;")
     cur.execute("BEGIN DBMS_STATS.GATHER_SCHEMA_STATS(ownname => USER); END;")
 
@@ -157,14 +177,15 @@ def main():
         n = cur.fetchone()[0]
         failed += n
         print(f"  {'OK ' if n == 0 else 'BAD'}  {what}" + (f"  ({n} rows)" if n else ""))
-    cur.execute("""SELECT (SELECT COUNT(*) FROM app_users WHERE user_role = 'CUSTOMER'),
+    cur.execute("""SELECT (SELECT COUNT(*) FROM customer_profiles),
                           (SELECT COUNT(*) FROM orders), (SELECT COUNT(*) FROM order_items),
                           (SELECT COUNT(*) FROM stock_movements) FROM dual""")
     c, o, i, m = cur.fetchone()
     conn.close()
     print(f"Loaded {c:,} customers, {o:,} orders, {i:,} order items, {m:,} stock movements "
           f"in {time.time() - started:.0f} s.")
-    print("Logins: admin@inventory.com / admin123, and every customer (e.g. customer@inventory.com) uses customer123.")
+    print("Logins: admin@ / manager@ / warehouse@inventory.com use admin123; every customer "
+          "(e.g. customer@inventory.com) uses customer123.")
     if failed:
         sys.exit(1)
 

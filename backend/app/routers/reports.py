@@ -9,14 +9,14 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from ..database import get_db, query, query_one
-from ..security import require_admin
+from ..security import Perm, require
 
-router = APIRouter(prefix="/api/reports", tags=["Reports (admin)"])
+router = APIRouter(prefix="/api/reports", tags=["Reports (staff)"])
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 @router.get("/dashboard")
-def dashboard(db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+def dashboard(db: oracledb.Connection = Depends(get_db), _: dict = Depends(require(Perm.REPORT_VIEW))):
     return query_one(db, """
         SELECT (SELECT NVL(SUM(total_amount), 0) FROM orders WHERE order_status = 'PAID')            AS total_revenue,
                (SELECT COUNT(*) FROM orders WHERE order_status = 'PAID')                             AS paid_orders,
@@ -67,7 +67,7 @@ def build_quarterly(db: oracledb.Connection, year: int, quarter: int) -> dict:
 
 @router.get("/quarterly")
 def quarterly(year: int = Query(..., ge=2000, le=2100), quarter: int = Query(..., ge=1, le=4),
-              db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+              db: oracledb.Connection = Depends(get_db), _: dict = Depends(require(Perm.REPORT_VIEW))):
     return build_quarterly(db, year, quarter)
 
 
@@ -78,7 +78,7 @@ SECTIONS = [("By outlet", "by_outlet"), ("By product", "by_product"), ("By categ
 @router.get("/quarterly/export")
 def export(year: int = Query(..., ge=2000, le=2100), quarter: int = Query(..., ge=1, le=4),
            format: str = Query("xlsx", pattern="^(csv|xlsx)$"),
-           db: oracledb.Connection = Depends(get_db), _: dict = Depends(require_admin)):
+           db: oracledb.Connection = Depends(get_db), _: dict = Depends(require(Perm.REPORT_DOWNLOAD))):
     data = build_quarterly(db, year, quarter)
     name = f"inventory_report_{year}_Q{quarter}"
 

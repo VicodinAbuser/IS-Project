@@ -1,10 +1,22 @@
 <div class="page-head"><div><h1>My orders</h1><p class="muted">Payment and delivery status for everything you've bought</p></div></div>
 @if (error()) { <div class="alert error">{{ error() }}</div> }
+<div class="card toolbar mb">
+  <div><label for="so">Sort by</label>
+    <select id="so" [(ngModel)]="filter.sort" (ngModelChange)="load()">@for (s of sorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+  <div><label for="st">Status</label>
+    <select id="st" [(ngModel)]="filter.status" (ngModelChange)="load()"><option value="">All orders</option>
+      <option value="PENDING_PAYMENT">Waiting for payment</option><option value="PAID">Paid</option>
+      <option value="CANCELLED">Cancelled</option><option value="RETURNED">Returned</option></select></div>
+  <div><label for="up">Updated</label>
+    <select id="up" [(ngModel)]="filter.updated_within_days" (ngModelChange)="load()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+  <span class="count">{{ orders().length }} orders</span>
+</div>
 <div class="grid">
   @for (o of orders(); track o.id) {
     <div class="card order">
       <div class="top">
-        <div><strong>Order #{{ o.id }}</strong> <span class="muted">· {{ o.created_at | date: 'medium' }} · {{ o.outlet.name }}</span></div>
+        <div><strong>Order #{{ o.id }}</strong> <span class="muted">· {{ o.created_at | date: 'medium' }} · {{ o.outlet.name }}</span>
+          <div class="muted small">Last updated {{ o.updated_at | date: 'medium' }}</div></div>
         <div class="badges">
           <span class="badge {{ o.status }}">{{ label(o.status) }}</span>
           <span class="badge {{ o.payment?.status }}">Payment: {{ label(o.payment?.status ?? '') }}</span>
@@ -29,5 +41,5 @@
         </div>
       </div>
     </div>
-  } @empty { <div class="card empty">No orders yet. <a routerLink="/shop">Start shopping</a></div> }
+  } @empty { <div class="card empty">No orders found. <a routerLink="/shop">Start shopping</a></div> }
 </div>

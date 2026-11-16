@@ -1,0 +1,13 @@
+PERMISSION_ID,PERMISSION_CODE,PERMISSION_NAME,MODULE,ACCESS_TYPE,DESCRIPTION
+1,CATALOG_READ,View products,CATALOG,READ,"See products, prices, categories and outlets"
+2,CATALOG_WRITE,Manage products,CATALOG,WRITE,"Add, edit and hide products; add outlets"
+3,ORDER_PLACE,Place orders,ORDERS,WRITE,"Buy, pay for and cancel own orders"
+4,ORDER_READ_OWN,View own orders,ORDERS,READ,"See own orders, payments and deliveries"
+5,ORDER_READ_ALL,View all orders,ORDERS,READ,See every customer's orders
+6,ORDER_MANAGE,Manage orders,ORDERS,WRITE,"Update deliveries, accept returns, cancel any order"
+7,STOCK_READ,View stock,INVENTORY,READ,"See stock per outlet, low stock and the movement log"
+8,STOCK_WRITE,Change stock,INVENTORY,WRITE,"Restock, adjust and transfer stock"
+9,REPORT_VIEW,View reports,REPORTS,REPORT,Dashboard and quarterly sales reports
+10,REPORT_DOWNLOAD,Download reports,REPORTS,DOWNLOAD,Export reports as Excel or CSV files
+11,USER_READ,View users,USERS,READ,"See users, their profiles and access rights"
+12,USER_MANAGE,Manage users,USERS,ADMIN,"Create staff accounts, assign profiles, disable or unlock users"

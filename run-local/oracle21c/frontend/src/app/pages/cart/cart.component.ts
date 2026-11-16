@@ -20,7 +20,14 @@ export class CartComponent implements OnInit {
   outlet = signal<Outlet | undefined>(undefined);
   error = signal('');
   placing = signal(false);
-  address = inject(AuthService).user()?.address ?? '';
+  // The default delivery address comes from the customer's profile (CUSTOMER_PROFILES); it can be changed here.
+  address = this.profileAddress();
+
+  private profileAddress(): string {
+    const u = inject(AuthService).user();
+    return [u?.address_line, u?.city && u.pincode ? `${u.city} - ${u.pincode}` : u?.city, u?.state]
+      .filter(Boolean).join(', ');
+  }
 
   ngOnInit() {
     this.api.getOutlets().subscribe(o => this.outlet.set(o.find(x => x.id === this.cart.outletId())));

@@ -4,8 +4,10 @@
     <select [(ngModel)]="year" (ngModelChange)="load()" aria-label="Year">@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
     <select [(ngModel)]="quarter" (ngModelChange)="load()" aria-label="Quarter">
       @for (q of [1, 2, 3, 4]; track q) { <option [ngValue]="q">Q{{ q }}</option> }</select>
-    <button class="btn secondary" (click)="download('csv')" [disabled]="downloading()">⬇ CSV</button>
-    <button class="btn" (click)="download('xlsx')" [disabled]="downloading()">⬇ Excel</button>
+    @if (auth.can('REPORT_DOWNLOAD')) {
+      <button class="btn secondary" (click)="download('csv')" [disabled]="downloading()">⬇ CSV</button>
+      <button class="btn" (click)="download('xlsx')" [disabled]="downloading()">⬇ Excel</button>
+    }
   </div>
 </div>
 @if (error()) { <div class="alert error">{{ error() }}</div> }

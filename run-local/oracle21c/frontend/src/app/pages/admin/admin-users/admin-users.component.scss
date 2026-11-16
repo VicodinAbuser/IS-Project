@@ -1,0 +1,15 @@
+.views { display: flex; gap: 8px; }
+.split { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start;
+  &:has(.detail) { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+  @media (max-width: 1000px) { &:has(.detail) { grid-template-columns: 1fr; } } }
+tr.on td { background: var(--primary-soft); }
+.detail { position: sticky; top: 76px;
+  .head { display: flex; justify-content: space-between; align-items: center; }
+  h3 { font-size: 14px; margin: 16px 0 8px; } }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 10px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.perms { margin: 0; padding-left: 18px; columns: 2; font-size: 13px; }
+.link { background: none; border: 0; color: var(--primary); cursor: pointer; font: inherit; }
+.matrix td.center, .matrix th.center { text-align: center; }
+.matrix td.center { font-size: 18px; color: var(--success); font-weight: 700; }
+.badge { margin: 1px 2px 1px 0; }

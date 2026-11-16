@@ -7,3 +7,4 @@ nav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap;
     &.active { background: var(--primary-soft); color: var(--primary); } } }
 .count { background: var(--primary); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 12px; margin-left: 4px; }
 .user { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.user { gap: 8px; .me { font-weight: 600; color: var(--text); &:hover { color: var(--primary); } } }

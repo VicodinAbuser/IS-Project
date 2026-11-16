@@ -49,5 +49,16 @@ tr.low td { background: var(--warning-soft); }
   &.info, &.SHIPPED, &.OUT_FOR_DELIVERY, &.REFUNDED { background: var(--primary-soft); color: var(--primary); }
 }
 .alert { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 14px;
-  &.error { background: var(--danger-soft); color: var(--danger); } &.ok { background: var(--success-soft); color: var(--success); } }
+  &.error { background: var(--danger-soft); color: var(--danger); } &.ok { background: var(--success-soft); color: var(--success); }
+  &.warn { background: var(--warning-soft); color: var(--warning); } }
 .empty { text-align: center; padding: 40px; color: var(--muted); }
+
+/* Sort / filter toolbar used above lists */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  > div { min-width: 150px; flex: 1 1 150px; max-width: 260px; }
+  .count { margin-left: auto; color: var(--muted); font-size: 13px; align-self: center; } }
+.small { font-size: 12px; }
+.nowrap { white-space: nowrap; }
+.mb { margin-bottom: 16px; }
+.chk { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; margin: 0;
+  input { width: auto; } }

@@ -1,0 +1,5 @@
+.layout { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start;
+  @media (max-width: 800px) { grid-template-columns: 1fr; } }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.perms { margin: 6px 0 0; padding-left: 18px; columns: 2; font-size: 13px; li { margin-bottom: 4px; } }
+input:disabled { background: var(--bg); color: var(--muted); }

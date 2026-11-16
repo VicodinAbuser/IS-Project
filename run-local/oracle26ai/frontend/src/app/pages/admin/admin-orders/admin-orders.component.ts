@@ -2,7 +2,8 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
-import { DeliveryStatus, Order, Outlet } from '../../../core/models';
+import { AuthService } from '../../../core/auth.service';
+import { Choice, DeliveryStatus, Order, Outlet, UPDATED_WITHIN } from '../../../core/models';
 
 @Component({
   selector: 'app-admin-orders',
@@ -12,10 +13,19 @@ import { DeliveryStatus, Order, Outlet } from '../../../core/models';
 })
 export class AdminOrdersComponent implements OnInit {
   private api = inject(ApiService);
+  auth = inject(AuthService);
   orders = signal<Order[]>([]);
+  loading = signal(false);
   outlets = signal<Outlet[]>([]);
   error = signal('');
-  filter = { status: '', outlet_id: null as number | null, delivery_status: '' };
+  filter = { status: '', outlet_id: null as number | null, delivery_status: '', search: '',
+             sort: 'updated_desc', updated_within_days: null as number | null, limit: 100 };
+  sorts: Choice[] = [
+    { value: 'updated_desc', label: 'Latest updated' }, { value: 'created_desc', label: 'Newest orders' },
+    { value: 'created_asc', label: 'Oldest orders' }, { value: 'amount_desc', label: 'Amount: high to low' },
+    { value: 'amount_asc', label: 'Amount: low to high' }, { value: 'updated_asc', label: 'Least recently updated' },
+  ];
+  within = UPDATED_WITHIN;
   deliveryStatuses: DeliveryStatus[] = ['PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'RETURNED'];
   edits: Record<number, { status: DeliveryStatus; courier: string; tracking_number: string }> = {};
 
@@ -25,15 +35,17 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   load() {
-    this.api.allOrders({ ...this.filter, outlet_id: this.filter.outlet_id ?? undefined }).subscribe({
+    this.loading.set(true);
+    this.api.allOrders(this.filter).subscribe({
       next: list => {
+        this.loading.set(false);
         this.orders.set(list);
         for (const o of list) this.edits[o.id] = {
           status: (o.delivery?.status ?? 'PACKED') as DeliveryStatus,
           courier: o.delivery?.courier ?? '', tracking_number: o.delivery?.tracking_number ?? '',
         };
       },
-      error: e => this.error.set(errorMessage(e)),
+      error: e => { this.error.set(errorMessage(e)); this.loading.set(false); },
     });
   }
 

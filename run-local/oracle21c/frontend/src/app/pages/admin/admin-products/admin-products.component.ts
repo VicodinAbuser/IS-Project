@@ -1,12 +1,12 @@
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
-import { Category, Product, Supplier } from '../../../core/models';
+import { Category, Choice, Product, Supplier, UPDATED_WITHIN } from '../../../core/models';
 
 @Component({
   selector: 'app-admin-products',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [CurrencyPipe, DatePipe, ReactiveFormsModule, FormsModule],
   templateUrl: './admin-products.component.html',
   styleUrl: './admin-products.component.scss',
 })
@@ -19,6 +19,13 @@ export class AdminProductsComponent implements OnInit {
   showForm = signal(false);
   error = signal('');
   message = signal('');
+  filter = { search: '', sort: 'updated_desc', updated_within_days: null as number | null, include_inactive: true };
+  sorts: Choice[] = [
+    { value: 'updated_desc', label: 'Latest updated' }, { value: 'newest', label: 'Newest products' },
+    { value: 'name_asc', label: 'Name A–Z' }, { value: 'price_asc', label: 'Price: low to high' },
+    { value: 'price_desc', label: 'Price: high to low' },
+  ];
+  within = UPDATED_WITHIN;
 
   form = inject(FormBuilder).group({
     sku: ['', [Validators.required, Validators.minLength(2)]],
@@ -38,7 +45,7 @@ export class AdminProductsComponent implements OnInit {
     this.api.getSuppliers().subscribe(s => this.suppliers.set(s));
   }
 
-  load() { this.api.getProducts({ include_inactive: true }).subscribe(p => this.products.set(p)); }
+  load() { this.api.getProducts(this.filter).subscribe(p => this.products.set(p)); }
 
   newProduct() {
     this.editingId.set(null);

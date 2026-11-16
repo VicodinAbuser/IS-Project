@@ -1,14 +1,31 @@
 <div class="auth card">
   <h1>Create account</h1>
-  <p class="muted">Customers can browse products and place orders</p>
-  @if (error()) { <div class="alert error">{{ error() }}</div> }
-  <form [formGroup]="form" (ngSubmit)="submit()">
-    <div class="field"><label for="name">Full name</label><input id="name" formControlName="name" /></div>
-    <div class="field"><label for="email">Email</label><input id="email" type="email" formControlName="email" /></div>
-    <div class="field"><label for="password">Password (min 6 characters)</label><input id="password" type="password" formControlName="password" /></div>
-    <div class="field"><label for="phone">Phone</label><input id="phone" formControlName="phone" /></div>
-    <div class="field"><label for="address">Delivery address</label><textarea id="address" rows="2" formControlName="address"></textarea></div>
-    <button class="btn full" type="submit" [disabled]="form.invalid">Register</button>
+  <p class="muted">Customers can browse products, place orders and track deliveries</p>
+  @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <h2>Login details</h2>
+    <div class="field"><label for="name">Full name</label><input id="name" formControlName="name" autocomplete="name" /></div>
+    <div class="field"><label for="email">Email (your username)</label><input id="email" type="email" formControlName="email" autocomplete="email" /></div>
+    <div class="field"><label for="password">Password (at least 8 characters)</label>
+      <div class="pw">
+        <input id="password" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" />
+        <button type="button" class="eye" (click)="showPassword.set(!showPassword())"
+                [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">{{ showPassword() ? '🙈' : '👁' }}</button>
+      </div></div>
+
+    <h2>Delivery details <span class="muted small">(optional, can be changed later)</span></h2>
+    <div class="field"><label for="phone">Mobile number</label><input id="phone" formControlName="phone" autocomplete="tel" /></div>
+    <div class="field"><label for="addr">House / street / area</label><input id="addr" formControlName="address_line" autocomplete="street-address" /></div>
+    <div class="form-row">
+      <div class="field"><label for="city">City</label><input id="city" formControlName="city" autocomplete="address-level2" /></div>
+      <div class="field"><label for="state">State</label><input id="state" formControlName="state" autocomplete="address-level1" /></div>
+      <div class="field"><label for="pin">PIN code</label><input id="pin" formControlName="pincode" inputmode="numeric" maxlength="6" autocomplete="postal-code" /></div>
+    </div>
+    <div class="field"><label for="outlet">Nearest outlet</label>
+      <select id="outlet" formControlName="preferred_outlet_id"><option [ngValue]="null">Choose later</option>
+        @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }} ({{ o.city }})</option> }</select></div>
+    @if (form.controls.pincode.invalid) { <p class="muted small">PIN code must be 6 digits.</p> }
+    <button class="btn full" type="submit" [disabled]="form.invalid || saving()">{{ saving() ? 'Creating…' : 'Register' }}</button>
   </form>
   <p class="muted">Already registered? <a routerLink="/login">Sign in</a></p>
 </div>

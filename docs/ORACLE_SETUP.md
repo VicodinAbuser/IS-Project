@@ -83,7 +83,7 @@ Double-click `START-APP.bat`, or start the backend (`uvicorn app.main:app`) and 
 - [ ] SQL Developer open with `database/04_demo_queries.sql` loaded
 - [ ] Optional: `5-reset-demo-data.bat` for fresh demo data
 
-**Remember `COMMIT;`** after your own `INSERT`/`UPDATE` in SQL Developer, or the website won't see the change. The `inventory_pkg` procedures commit by themselves.
+**Always end your own changes in SQL Developer with `COMMIT;` (or `ROLLBACK;`).** Until then the website can't see the change, and the changed row stays locked, so the website waits for it. The `inventory_pkg` procedures never commit by themselves: the Python backend commits each whole action.
 
 ## Troubleshooting
 

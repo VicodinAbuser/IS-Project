@@ -28,15 +28,24 @@
       <button class="btn secondary" type="button" (click)="showForm.set(false)">Cancel</button></div>
   </form>
 }
+<div class="card toolbar mb">
+  <div><label for="q">Search</label><input id="q" placeholder="Name or SKU" [(ngModel)]="filter.search" (keyup.enter)="load()" /></div>
+  <div><label for="so">Sort by</label>
+    <select id="so" [(ngModel)]="filter.sort" (ngModelChange)="load()">@for (s of sorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+  <div><label for="up">Updated</label>
+    <select id="up" [(ngModel)]="filter.updated_within_days" (ngModelChange)="load()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+  <span class="count">{{ products().length }} products</span>
+</div>
 <div class="card table-wrap">
   <table>
-    <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Supplier</th><th class="right">Price</th><th class="right">Total stock</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Supplier</th><th class="right">Price</th><th class="right">Total stock</th><th>Status</th><th>Last updated</th><th></th></tr></thead>
     <tbody>
       @for (p of products(); track p.id) {
         <tr>
           <td>{{ p.sku }}</td><td><strong>{{ p.name }}</strong></td><td>{{ p.category?.name }}</td><td>{{ p.supplier?.name }}</td>
           <td class="right">{{ p.price | currency: 'INR' }}</td><td class="right">{{ p.total_stock }}</td>
           <td><span class="badge" [class.success]="p.is_active">{{ p.is_active ? 'Active' : 'Hidden' }}</span></td>
+          <td class="small nowrap">{{ p.updated_at | date: 'dd MMM yy, HH:mm' }}</td>
           <td class="actions"><button class="btn secondary sm" (click)="edit(p)">Edit</button>
             @if (p.is_active) { <button class="btn secondary sm" (click)="deactivate(p)">Hide</button> }</td>
         </tr>

@@ -1,12 +1,13 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, errorMessage } from '../../core/api.service';
-import { DeliveryStatus, Order } from '../../core/models';
+import { Choice, DeliveryStatus, Order, UPDATED_WITHIN } from '../../core/models';
 
 @Component({
   selector: 'app-my-orders',
-  imports: [CurrencyPipe, DatePipe, RouterLink],
+  imports: [CurrencyPipe, DatePipe, RouterLink, FormsModule],
   templateUrl: './my-orders.component.html',
   styleUrl: './my-orders.component.scss',
 })
@@ -15,10 +16,16 @@ export class MyOrdersComponent implements OnInit {
   orders = signal<Order[]>([]);
   error = signal('');
   steps: DeliveryStatus[] = ['PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+  filter = { sort: 'updated_desc', status: '', updated_within_days: null as number | null };
+  sorts: Choice[] = [
+    { value: 'updated_desc', label: 'Latest update first' }, { value: 'created_desc', label: 'Newest orders first' },
+    { value: 'created_asc', label: 'Oldest orders first' }, { value: 'amount_desc', label: 'Amount: high to low' },
+  ];
+  within = UPDATED_WITHIN;
 
   ngOnInit() { this.load(); }
 
-  load() { this.api.myOrders().subscribe({ next: o => this.orders.set(o), error: e => this.error.set(errorMessage(e)) }); }
+  load() { this.api.myOrders(this.filter).subscribe({ next: o => this.orders.set(o), error: e => this.error.set(errorMessage(e)) }); }
 
   stepIndex(o: Order) { return this.steps.indexOf(o.delivery?.status as DeliveryStatus); }
 

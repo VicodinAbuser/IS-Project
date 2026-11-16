@@ -1,23 +1,34 @@
 <div class="page-head"><div><h1>Orders</h1><p class="muted">Payment status and delivery tracking for every order</p></div></div>
 @if (error()) { <div class="alert error">{{ error() }}</div> }
-<div class="card form-row">
+<div class="card toolbar">
+  <div><label for="q">Search</label><input id="q" placeholder="Order # or customer name / email" [(ngModel)]="filter.search" (keyup.enter)="load()" /></div>
+  <div><label for="so">Sort by</label>
+    <select id="so" [(ngModel)]="filter.sort" (ngModelChange)="load()">@for (s of sorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+  <div><label for="up">Updated</label>
+    <select id="up" [(ngModel)]="filter.updated_within_days" (ngModelChange)="load()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
   <div><label for="st">Order status</label>
     <select id="st" [(ngModel)]="filter.status" (ngModelChange)="load()"><option value="">All</option>
       <option value="PENDING_PAYMENT">Pending payment</option><option value="PAID">Paid</option><option value="CANCELLED">Cancelled</option><option value="RETURNED">Returned</option></select></div>
   <div><label for="ds">Delivery status</label>
     <select id="ds" [(ngModel)]="filter.delivery_status" (ngModelChange)="load()"><option value="">All</option>
+      <option value="NOT_SHIPPED">Not shipped</option>
       @for (d of deliveryStatuses; track d) { <option [value]="d">{{ label(d) }}</option> }</select></div>
   <div><label for="ou">Outlet</label>
     <select id="ou" [(ngModel)]="filter.outlet_id" (ngModelChange)="load()"><option [ngValue]="null">All</option>
       @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+  <div><label for="li">Show</label>
+    <select id="li" [(ngModel)]="filter.limit" (ngModelChange)="load()"><option [ngValue]="50">50</option><option [ngValue]="100">100</option><option [ngValue]="500">500</option></select></div>
+  <span class="count">{{ loading() ? 'Loading…' : orders().length + ' shown' }}</span>
 </div>
 <div class="card table-wrap mt">
   <table>
-    <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Outlet</th><th>Items</th><th class="right">Amount</th><th>Payment</th><th>Delivery</th><th></th></tr></thead>
+    <thead><tr><th>#</th><th>Ordered</th><th>Last updated</th><th>Customer</th><th>Outlet</th><th>Items</th><th class="right">Amount</th><th>Payment</th><th>Delivery</th><th></th></tr></thead>
     <tbody>
       @for (o of orders(); track o.id) {
         <tr>
-          <td>{{ o.id }}</td><td>{{ o.created_at | date: 'dd MMM yy' }}</td>
+          <td>{{ o.id }}</td>
+          <td class="small nowrap">{{ o.created_at | date: 'dd MMM yy, HH:mm' }}</td>
+          <td class="small nowrap"><strong>{{ o.updated_at | date: 'dd MMM yy, HH:mm' }}</strong></td>
           <td>{{ o.customer.name }}<br /><span class="muted small">{{ o.customer.email }}</span></td>
           <td>{{ o.outlet.name }}</td>
           <td class="small">@for (i of o.items; track i.product_id) { <div>{{ i.product.name }} × {{ i.quantity }}</div> }</td>
@@ -25,19 +36,20 @@
           <td><span class="badge {{ o.payment?.status }}">{{ o.payment?.status }}</span>
             @if (o.payment?.method) { <div class="muted small">{{ o.payment?.method }}</div> }</td>
           <td>
-            @if (o.status === 'PAID') {
+            @if (o.status === 'PAID' && auth.can('ORDER_MANAGE')) {
               <div class="delivery">
                 <select [(ngModel)]="edits[o.id].status">@for (d of deliveryStatuses; track d) { <option [value]="d">{{ label(d) }}</option> }</select>
                 <input placeholder="Courier" [(ngModel)]="edits[o.id].courier" />
                 <input placeholder="Tracking #" [(ngModel)]="edits[o.id].tracking_number" />
                 <button class="btn sm" (click)="saveDelivery(o)">Save</button>
               </div>
+            } @else if (o.status === 'PAID') { <span class="badge {{ o.delivery?.status }}">{{ label(o.delivery?.status) }}</span>
             } @else { <span class="badge {{ o.status }}">{{ label(o.status) }}</span> }
           </td>
-          <td>@if (o.status !== 'CANCELLED' && ['NOT_SHIPPED', 'PACKED'].includes(o.delivery?.status ?? '')) {
+          <td>@if (auth.can('ORDER_MANAGE') && o.status !== 'CANCELLED' && ['NOT_SHIPPED', 'PACKED'].includes(o.delivery?.status ?? '')) {
             <button class="btn secondary sm" (click)="cancel(o)">Cancel</button> }</td>
         </tr>
-      } @empty { <tr><td colspan="9" class="empty">No orders match.</td></tr> }
+      } @empty { <tr><td colspan="10" class="empty">No orders match.</td></tr> }
     </tbody>
   </table>
 </div>

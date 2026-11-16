@@ -9,6 +9,7 @@ PL/SQL package INVENTORY_PKG, so every table agrees with every other table:
   - ORDERS.TOTAL_AMOUNT = sum of its items, and PAYMENTS.AMOUNT = the order total
   - order / payment / delivery statuses only appear in combinations the package can produce
   - all dates are in the right order (sign-up -> order -> payment -> shipping -> delivery)
+  - every user has a profile (USER_PROFILES); every customer has a CUSTOMER_PROFILES row
 The same seed always gives the same files. Check them with: python tools/validate_dataset.py
 """
 import csv
@@ -207,6 +208,41 @@ BUILDINGS = ["Sai Residency", "Green Park Apartments", "Lotus Towers", "Shanti N
              "Sunrise Enclave", "Palm Grove", "Krishna Kunj", "Silver Oak", "Gulmohar Society"]
 EMAIL_DOMAINS = ["example.com", "example.in", "example.org", "mail.example", "inbox.example"]
 COURIERS = [("BlueDart", "BD"), ("Delhivery", "DL"), ("DTDC", "DT"), ("Ecom Express", "EC"), ("XpressBees", "XB")]
+# Access control: the same reference rows as the end of database/01_schema.sql
+PROFILES = [  # code, name, description, is_staff
+    ("ADMIN", "Administrator", "Full access, including users and access rights", 1),
+    ("STORE_MANAGER", "Store manager", "Runs the outlets: catalogue, stock, orders and reports", 1),
+    ("WAREHOUSE_STAFF", "Warehouse staff", "Receives and moves stock, packs and ships orders", 1),
+    ("CUSTOMER", "Customer", "Shops online and tracks their own orders", 0),
+]
+PERMISSIONS = [  # code, name, module, access_type, description
+    ("CATALOG_READ", "View products", "CATALOG", "READ", "See products, prices, categories and outlets"),
+    ("CATALOG_WRITE", "Manage products", "CATALOG", "WRITE", "Add, edit and hide products; add outlets"),
+    ("ORDER_PLACE", "Place orders", "ORDERS", "WRITE", "Buy, pay for and cancel own orders"),
+    ("ORDER_READ_OWN", "View own orders", "ORDERS", "READ", "See own orders, payments and deliveries"),
+    ("ORDER_READ_ALL", "View all orders", "ORDERS", "READ", "See every customer's orders"),
+    ("ORDER_MANAGE", "Manage orders", "ORDERS", "WRITE", "Update deliveries, accept returns, cancel any order"),
+    ("STOCK_READ", "View stock", "INVENTORY", "READ", "See stock per outlet, low stock and the movement log"),
+    ("STOCK_WRITE", "Change stock", "INVENTORY", "WRITE", "Restock, adjust and transfer stock"),
+    ("REPORT_VIEW", "View reports", "REPORTS", "REPORT", "Dashboard and quarterly sales reports"),
+    ("REPORT_DOWNLOAD", "Download reports", "REPORTS", "DOWNLOAD", "Export reports as Excel or CSV files"),
+    ("USER_READ", "View users", "USERS", "READ", "See users, their profiles and access rights"),
+    ("USER_MANAGE", "Manage users", "USERS", "ADMIN", "Create staff accounts, assign profiles, disable or unlock users"),
+]
+MATRIX = {
+    "ADMIN": [p[0] for p in PERMISSIONS],
+    "STORE_MANAGER": ["CATALOG_READ", "CATALOG_WRITE", "ORDER_READ_ALL", "ORDER_MANAGE", "STOCK_READ", "STOCK_WRITE",
+                      "REPORT_VIEW", "REPORT_DOWNLOAD", "USER_READ"],
+    "WAREHOUSE_STAFF": ["CATALOG_READ", "ORDER_READ_ALL", "ORDER_MANAGE", "STOCK_READ", "STOCK_WRITE"],
+    "CUSTOMER": ["CATALOG_READ", "ORDER_PLACE", "ORDER_READ_OWN"],
+}
+SETUP_TIME = START - timedelta(days=60)   # when the system was installed (reference data created)
+STATES = {"Mumbai": "Maharashtra", "Pune": "Maharashtra", "Thane": "Maharashtra", "Navi Mumbai": "Maharashtra",
+          "Bengaluru": "Karnataka", "Mysuru": "Karnataka", "Delhi": "Delhi", "Gurugram": "Haryana",
+          "Noida": "Uttar Pradesh", "Lucknow": "Uttar Pradesh", "Chennai": "Tamil Nadu", "Coimbatore": "Tamil Nadu",
+          "Hyderabad": "Telangana", "Kolkata": "West Bengal", "Ahmedabad": "Gujarat", "Surat": "Gujarat",
+          "Jaipur": "Rajasthan", "Kochi": "Kerala"}
+
 ADJUST_DOWN = ["Damaged in storage", "Expired / unsellable", "Stock count correction (missing)", "Damaged in transit"]
 ADJUST_UP = ["Stock count correction (found extra)", "Supplier sent extra units"]
 
@@ -259,6 +295,7 @@ def build_master():
             "image_url": f"https://picsum.photos/seed/{sku}/400/300", "reorder_level": 10,
             "is_active": 0 if withdrawn else 1, "category_id": cat_id[cat],
             "supplier_id": sup_id[sup] if sup else "", "created_at": launch - timedelta(days=rng.randint(1, 5)),
+            "updated_at": withdrawn or launch - timedelta(days=1),     # hidden from the shop = last change
             # not columns, used by the simulation:
             "_launch": launch, "_withdrawn": withdrawn,
             "_popularity": rng.uniform(0.3, 1.0) * (2.5 if price < 700 else 1.6 if price < 2000 else 1.0),
@@ -268,18 +305,23 @@ def build_master():
 
 
 def build_users():
-    users = [{"user_id": 1, "full_name": "Store Admin", "email": "admin@inventory.com", "password_hash": ADMIN_HASH,
-              "user_role": "ADMIN", "phone": "", "address": "", "created_at": START - timedelta(days=45)}]
-    fixed = [("Demo Customer", "customer@inventory.com", "9876543210", "12 Hill Road, Bandra, Mumbai", "Mumbai"),
-             ("Priya Sharma", "priya@example.com", "9876543211", "45 MG Road, Pune", "Pune"),
-             ("Rahul Verma", "rahul@example.com", "9876543212", "8 Indiranagar, Bengaluru", "Bengaluru"),
-             ("Aisha Khan", "aisha@example.com", "9876543213", "22 Connaught Place, Delhi", "Delhi")]
+    """USERS rows; profile, address and home outlet are kept in _fields for the other tables."""
+    def user(name, email, pw_hash, profile, created, **extra):
+        return {"user_id": len(users) + 1, "full_name": name, "email": email, "password_hash": pw_hash,
+                "account_status": "ACTIVE", "failed_login_count": 0, "locked_until": "", "last_login_at": "",
+                "created_at": created, "updated_at": created, "_profile": profile, **extra}
+
+    users = []
+    users.append(user("Store Admin", "admin@inventory.com", ADMIN_HASH, "ADMIN", START - timedelta(days=45)))
+    fixed = [("Demo Customer", "customer@inventory.com", "9876543210", "12 Hill Road, Bandra", "Mumbai", "400050"),
+             ("Priya Sharma", "priya@example.com", "9876543211", "45 MG Road", "Pune", "411001"),
+             ("Rahul Verma", "rahul@example.com", "9876543212", "8 Indiranagar", "Bengaluru", "560038"),
+             ("Aisha Khan", "aisha@example.com", "9876543213", "22 Connaught Place", "Delhi", "110001")]
     emails = {"admin@inventory.com"} | {f[1] for f in fixed}
     phones = {f[2] for f in fixed}
-    for name, email, phone, addr, city in fixed:
-        users.append({"user_id": len(users) + 1, "full_name": name, "email": email, "password_hash": CUSTOMER_HASH,
-                      "user_role": "CUSTOMER", "phone": phone, "address": addr,
-                      "created_at": START - timedelta(days=rng.randint(5, 15)), "_city": city})
+    for name, email, phone, line, city, pin in fixed:
+        users.append(user(name, email, CUSTOMER_HASH, "CUSTOMER", START - timedelta(days=rng.randint(5, 15)),
+                          _phone=phone, _line=line, _city=city, _pincode=pin, _address=f"{line}, {city} - {pin}"))
 
     city_names = list(CITIES)
     city_weights = [CITIES[c][0] for c in city_names]
@@ -298,15 +340,42 @@ def build_users():
         _, areas, pin, _ = CITIES[city]
         flat = f"Flat {rng.randint(1, 20)}{rng.randint(0, 3):02d}, {rng.choice(BUILDINGS)}, " if rng.random() < 0.55 \
             else f"{rng.randint(1, 450)}, "
-        address = f"{flat}{rng.choice(STREETS)}, {rng.choice(areas)}, {city} - {pin}{rng.randint(1, 99):03d}"
-        users.append({"user_id": len(users) + 1, "full_name": f"{first} {last}", "email": email,
-                      "password_hash": CUSTOMER_HASH, "user_role": "CUSTOMER", "phone": phone, "address": address,
-                      "created_at": rand_time(START, END - timedelta(days=2)), "_city": city})
-    # Two more staff accounts who manage stock (password admin123)
-    for name, email in [("Inventory Manager", "manager@inventory.com"), ("Warehouse Supervisor", "warehouse@inventory.com")]:
-        users.append({"user_id": len(users) + 1, "full_name": name, "email": email, "password_hash": ADMIN_HASH,
-                      "user_role": "ADMIN", "phone": "", "address": "", "created_at": START - timedelta(days=40)})
+        line = f"{flat}{rng.choice(STREETS)}, {rng.choice(areas)}"
+        pincode = f"{pin}{rng.randint(1, 99):03d}"
+        users.append(user(f"{first} {last}", email, CUSTOMER_HASH, "CUSTOMER", rand_time(START, END - timedelta(days=2)),
+                          _phone=phone, _line=line, _city=city, _pincode=pincode, _address=f"{line}, {city} - {pincode}"))
+    # Two more staff accounts (password admin123)
+    users.append(user("Inventory Manager", "manager@inventory.com", ADMIN_HASH, "STORE_MANAGER", START - timedelta(days=40)))
+    users.append(user("Warehouse Supervisor", "warehouse@inventory.com", ADMIN_HASH, "WAREHOUSE_STAFF",
+                      START - timedelta(days=40)))
     return users
+
+
+def build_access(users, outlet_by_name):
+    """PROFILES, PERMISSIONS, AUTHORIZATIONS (reference data), USER_PROFILES and CUSTOMER_PROFILES."""
+    profiles = [{"profile_id": i, "profile_code": c, "profile_name": n, "description": d, "is_staff": s}
+                for i, (c, n, d, s) in enumerate(PROFILES, 1)]
+    profile_id = {p["profile_code"]: p["profile_id"] for p in profiles}
+    permissions = [{"permission_id": i, "permission_code": c, "permission_name": n, "module": m, "access_type": a,
+                    "description": d} for i, (c, n, m, a, d) in enumerate(PERMISSIONS, 1)]
+    permission_id = {p["permission_code"]: p["permission_id"] for p in permissions}
+    authorizations = [{"profile_id": profile_id[prof], "permission_id": permission_id[perm], "granted_at": SETUP_TIME,
+                       "granted_by": ""}
+                      for prof, perms in MATRIX.items() for perm in sorted(perms, key=permission_id.get)]
+    admin = next(u["user_id"] for u in users if u["_profile"] == "ADMIN")
+    user_profiles, customer_profiles = [], []
+    for u in users:
+        staff = u["_profile"] != "CUSTOMER"
+        user_profiles.append({"user_id": u["user_id"], "profile_id": profile_id[u["_profile"]],
+                              "assigned_at": u["created_at"],
+                              "assigned_by": admin if staff and u["user_id"] != admin else ""})
+        if not staff:
+            customer_profiles.append({
+                "customer_id": u["user_id"], "phone": u["_phone"], "address_line": u["_line"], "city": u["_city"],
+                "state": STATES[u["_city"]], "pincode": u["_pincode"],
+                "preferred_outlet_id": outlet_by_name[CITIES[u["_city"]][3]],
+                "created_at": u["created_at"], "updated_at": u["created_at"]})
+    return profiles, permissions, authorizations, user_profiles, customer_profiles
 
 
 # ----------------------------------------------------------------- order plans
@@ -317,14 +386,14 @@ def plan_orders(users, products, outlet_by_name):
     count_weights = [20, 32, 23, 12, 7, 3, 1.2, 0.8, 0.5, 0.3, 0.2]
     plans = []
     for u in users:
-        if u["user_role"] != "CUSTOMER":
+        if u["_profile"] != "CUSTOMER":
             continue
         n = rng.randint(5, 9) if u["user_id"] <= 5 else pick_weighted(count_options, count_weights)
         home = outlet_by_name[CITIES[u["_city"]][3]]
         for _ in range(n):
             t = order_time(max(u["created_at"] + timedelta(minutes=rng.randint(5, 600)), START))
             outlet = home if rng.random() < 0.88 else rng.randint(1, n_outlets)
-            address = u["address"] if rng.random() < 0.9 else \
+            address = u["_address"] if rng.random() < 0.9 else \
                 f"Office: {rng.randint(1, 30)}th Floor, {rng.choice(['Tech Park', 'Trade Centre', 'Business Bay', 'Corporate Tower'])}, " \
                 f"{rng.choice(CITIES[u['_city']][1])}, {u['_city']}"
             plans.append({"t": t, "customer": u["user_id"], "outlet": outlet, "address": address})
@@ -380,7 +449,8 @@ def plan_orders(users, products, outlet_by_name):
 
 # ----------------------------------------------------------------- simulation
 def simulate(users, products, outlets, plans, outlet_by_name):
-    admins = [u["user_id"] for u in users if u["user_role"] == "ADMIN"]
+    admins = [u["user_id"] for u in users if "STOCK_WRITE" in MATRIX[u["_profile"]]]   # staff who may change stock
+    warehouse = [u["user_id"] for u in users if u["_profile"] == "WAREHOUSE_STAFF"]
     prod = {p["product_id"]: p for p in products}
     outlet_name = {o["outlet_id"]: o["name"] for o in outlets}
     stock, last_change, inv_order = {}, {}, []
@@ -508,8 +578,8 @@ def simulate(users, products, outlets, plans, outlet_by_name):
             o, oid = plan["order_id"], plan["outlet"]
             if plan["fate"] == "EXPIRED":
                 mtype, user, note = "CANCEL", None, f"Order #{o} not paid within {PAYMENT_TIMEOUT_MIN} minutes"
-            elif plan["fate"] == "RETURNED":
-                mtype, user, note = "RETURN", None, f"Order #{o} returned"
+            elif plan["fate"] == "RETURNED":   # accepted back by warehouse staff
+                mtype, user, note = "RETURN", warehouse[0], f"Order #{o} returned"
             else:
                 mtype, user, note = "CANCEL", plan["customer"], f"Order #{o} cancelled"
             for pid, qty in plan["lines"].items():
@@ -520,9 +590,10 @@ def simulate(users, products, outlets, plans, outlet_by_name):
     for p in orders:
         o, fate = p["order_id"], p["fate"]
         status = {"PAID": "PAID", "RETURNED": "RETURNED"}.get(fate, "CANCELLED")
-        order_rows.append({"order_id": o, "customer_id": p["customer"], "outlet_id": p["outlet"],
-                           "order_status": status, "total_amount": p["total"],
-                           "shipping_address": p["address"], "created_at": p["t"]})
+        order_row = {"order_id": o, "customer_id": p["customer"], "outlet_id": p["outlet"],
+                     "order_status": status, "total_amount": p["total"],
+                     "shipping_address": p["address"], "created_at": p["t"]}
+        order_rows.append(order_row)
         method = p["method"] if (fate not in ("EXPIRED", "CANCELLED_UNPAID") or p["failed_attempt"]) else ""
         if fate in ("EXPIRED", "CANCELLED_UNPAID"):
             pay_status, txn, pay_time = "CANCELLED", "", p["t_end"]
@@ -553,6 +624,8 @@ def simulate(users, products, outlets, plans, outlet_by_name):
                 tracking = f"{p['courier'][1]}{o:09d}"
         deliveries.append({"delivery_id": o, "order_id": o, "delivery_status": d_status, "courier": courier,
                            "tracking_number": tracking, "updated_at": d_time})
+        # Triggers keep ORDERS.UPDATED_AT at the latest change of the order, its payment or its delivery.
+        order_row["updated_at"] = max(p["t"], pay_time, d_time, p.get("t_end", p["t"]) if fate != "PAID" else p["t"])
 
     inventory = [{"inventory_id": i, "product_id": k[0], "outlet_id": k[1], "quantity": stock[k],
                   "updated_at": last_change[k]} for i, k in enumerate(inv_order, 1)]
@@ -561,14 +634,22 @@ def simulate(users, products, outlets, plans, outlet_by_name):
 
 # ----------------------------------------------------------------- write CSVs
 COLUMNS = {
-    "app_users": ["user_id", "full_name", "email", "password_hash", "user_role", "phone", "address", "created_at"],
+    "users": ["user_id", "full_name", "email", "password_hash", "account_status", "failed_login_count", "locked_until",
+              "last_login_at", "created_at", "updated_at"],
     "outlets": ["outlet_id", "name", "city", "address"],
+    "customer_profiles": ["customer_id", "phone", "address_line", "city", "state", "pincode", "preferred_outlet_id",
+                          "created_at", "updated_at"],
+    "profiles": ["profile_id", "profile_code", "profile_name", "description", "is_staff"],
+    "permissions": ["permission_id", "permission_code", "permission_name", "module", "access_type", "description"],
+    "authorizations": ["profile_id", "permission_id", "granted_at", "granted_by"],
+    "user_profiles": ["user_id", "profile_id", "assigned_at", "assigned_by"],
     "categories": ["category_id", "name"],
     "suppliers": ["supplier_id", "name", "contact_email", "phone"],
     "products": ["product_id", "sku", "name", "description", "price", "image_url", "reorder_level", "is_active",
-                 "category_id", "supplier_id", "created_at"],
+                 "category_id", "supplier_id", "created_at", "updated_at"],
     "inventory": ["inventory_id", "product_id", "outlet_id", "quantity", "updated_at"],
-    "orders": ["order_id", "customer_id", "outlet_id", "order_status", "total_amount", "shipping_address", "created_at"],
+    "orders": ["order_id", "customer_id", "outlet_id", "order_status", "total_amount", "shipping_address", "created_at",
+               "updated_at"],
     "order_items": ["order_item_id", "order_id", "product_id", "quantity", "unit_price"],
     "payments": ["payment_id", "order_id", "amount", "payment_method", "payment_status", "transaction_ref", "updated_at"],
     "deliveries": ["delivery_id", "order_id", "delivery_status", "courier", "tracking_number", "updated_at"],
@@ -592,16 +673,27 @@ def write(table, rows):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "app_users.csv").unlink(missing_ok=True)       # the users file of the earlier version
     outlets, outlet_by_name, categories, suppliers, products = build_master()
     users = build_users()
+    profiles, permissions, authorizations, user_profiles, customer_profiles = build_access(users, outlet_by_name)
     plans = plan_orders(users, products, outlet_by_name)
     orders, items, payments, deliveries, inventory, movements = simulate(users, products, outlets, plans, outlet_by_name)
+    # Last login: customers logged in to place their latest order; staff logged in today.
+    last_order = {}
+    for o in orders:
+        last_order[o["customer_id"]] = o["created_at"]
+    for u in users:
+        u["last_login_at"] = (last_order.get(u["user_id"], "") if u["_profile"] == "CUSTOMER"
+                              else END - timedelta(hours=rng.uniform(1, 8)))
     print(f"Writing {OUT.relative_to(ROOT)}/")
-    for table, rows in [("app_users", users), ("outlets", outlets), ("categories", categories),
-                        ("suppliers", suppliers), ("products", products), ("inventory", inventory),
-                        ("orders", orders), ("order_items", items), ("payments", payments),
-                        ("deliveries", deliveries), ("stock_movements", movements)]:
-        write(table, rows)
+    tables = {"users": users, "outlets": outlets, "customer_profiles": customer_profiles, "profiles": profiles,
+              "permissions": permissions, "authorizations": authorizations, "user_profiles": user_profiles,
+              "categories": categories, "suppliers": suppliers, "products": products, "inventory": inventory,
+              "orders": orders, "order_items": items, "payments": payments, "deliveries": deliveries,
+              "stock_movements": movements}
+    for table in FILE_ORDER:
+        write(table, tables[table])
 
 
 if __name__ == "__main__":

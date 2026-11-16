@@ -1,5 +1,6 @@
 <div class="page-head"><div><h1>Inventory</h1><p class="muted">Stock per outlet, collective totals and full audit log</p></div></div>
 
+@if (auth.can('STOCK_WRITE')) {
 <form class="card" (ngSubmit)="submit()">
   <div class="tabs">
     <button type="button" [class.on]="action === 'restock'" (click)="action = 'restock'">Restock (new arrival)</button>
@@ -26,6 +27,7 @@
     <div><button class="btn full" type="submit">Update stock</button></div>
   </div>
 </form>
+} @else { @if (error()) { <div class="alert error">{{ error() }}</div> } }
 
 <div class="views mt">
   <button class="btn sm" [class.secondary]="view() !== 'outlet'" (click)="view.set('outlet')">By outlet</button>
@@ -35,24 +37,31 @@
 
 @switch (view()) {
   @case ('outlet') {
+    <div class="card mt toolbar">
+      <div><label for="flt">Outlet</label>
+        <select id="flt" [(ngModel)]="stockFilter.outlet_id" (ngModelChange)="loadStock()"><option [ngValue]="null">All outlets</option>
+          @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+      <div><label for="sq">Search</label><input id="sq" placeholder="Product or SKU" [(ngModel)]="stockFilter.search" (keyup.enter)="loadStock()" /></div>
+      <div><label for="ss">Sort by</label>
+        <select id="ss" [(ngModel)]="stockFilter.sort" (ngModelChange)="loadStock()">@for (s of stockSorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+      <div><label for="su">Updated</label>
+        <select id="su" [(ngModel)]="stockFilter.updated_within_days" (ngModelChange)="loadStock()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+      <label class="chk"><input type="checkbox" [(ngModel)]="stockFilter.low_only" (ngModelChange)="loadStock()" /> Low stock only</label>
+      <span class="count">{{ rows().length }} rows</span>
+    </div>
     <div class="card table-wrap mt">
-      <div class="form-row toolbar">
-        <div><label for="flt">Outlet</label>
-          <select id="flt" [(ngModel)]="outletFilter" (ngModelChange)="refresh()"><option [ngValue]="null">All outlets</option>
-            @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-        <label class="chk"><input type="checkbox" [checked]="lowOnly()" (change)="lowOnly.set(!lowOnly())" /> Low stock only</label>
-      </div>
       <table>
-        <thead><tr><th>SKU</th><th>Product</th><th>Outlet</th><th class="right">Quantity</th><th class="right">Reorder at</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>SKU</th><th>Product</th><th>Outlet</th><th class="right">Quantity</th><th class="right">Reorder at</th><th>Status</th><th>Last updated</th><th></th></tr></thead>
         <tbody>
-          @for (r of shownRows(); track r.product_id + '-' + r.outlet_id) {
+          @for (r of rows(); track r.product_id + '-' + r.outlet_id) {
             <tr [class.low]="r.low_stock">
               <td>{{ r.sku }}</td><td>{{ r.product_name }}</td><td>{{ r.outlet_name }}</td>
               <td class="right"><strong>{{ r.quantity }}</strong></td><td class="right">{{ r.reorder_level }}</td>
               <td><span class="badge" [class.warning]="r.low_stock" [class.success]="!r.low_stock">{{ r.low_stock ? 'Low' : 'OK' }}</span></td>
-              <td><button class="btn secondary sm" (click)="pick(r)">Select</button></td>
+              <td class="small nowrap">{{ r.updated_at | date: 'dd MMM yy, HH:mm' }}</td>
+              <td>@if (auth.can('STOCK_WRITE')) { <button class="btn secondary sm" (click)="pick(r)">Select</button> }</td>
             </tr>
-          }
+          } @empty { <tr><td colspan="8" class="empty">No stock rows match.</td></tr> }
         </tbody>
       </table>
     </div>
@@ -78,16 +87,31 @@
     }
   }
   @case ('log') {
+    <div class="card mt toolbar">
+      <div><label for="lt">Type</label>
+        <select id="lt" [(ngModel)]="logFilter.movement_type" (ngModelChange)="loadLog()"><option value="">All types</option>
+          @for (t of types; track t) { <option [value]="t">{{ t }}</option> }</select></div>
+      <div><label for="lo">Outlet</label>
+        <select id="lo" [(ngModel)]="logFilter.outlet_id" (ngModelChange)="loadLog()"><option [ngValue]="null">All outlets</option>
+          @for (o of outlets(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+      <div><label for="lq">Search</label><input id="lq" placeholder="Product, SKU or note" [(ngModel)]="logFilter.search" (keyup.enter)="loadLog()" /></div>
+      <div><label for="ls">Sort by</label>
+        <select id="ls" [(ngModel)]="logFilter.sort" (ngModelChange)="loadLog()">@for (s of logSorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+      <div><label for="lu">When</label>
+        <select id="lu" [(ngModel)]="logFilter.updated_within_days" (ngModelChange)="loadLog()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+      <span class="count">{{ movements().length }} shown</span>
+    </div>
     <div class="card table-wrap mt">
       <table>
-        <thead><tr><th>When</th><th>Type</th><th>Product</th><th>Outlet</th><th class="right">Change</th><th>Note / order</th></tr></thead>
+        <thead><tr><th>When</th><th>Type</th><th>Product</th><th>Outlet</th><th class="right">Change</th><th>By</th><th>Note / order</th></tr></thead>
         <tbody>
           @for (m of movements(); track m.id) {
-            <tr><td>{{ m.created_at | date: 'short' }}</td><td><span class="badge">{{ m.movement_type }}</span></td>
+            <tr><td class="small nowrap">{{ m.created_at | date: 'dd MMM yy, HH:mm' }}</td><td><span class="badge">{{ m.movement_type }}</span></td>
               <td>{{ m.product.name }}</td><td>{{ m.outlet.name }}</td>
               <td class="right" [class.pos]="m.change > 0" [class.neg]="m.change < 0">{{ m.change > 0 ? '+' : '' }}{{ m.change }}</td>
+              <td class="small">{{ m.changed_by ?? 'System' }}</td>
               <td class="muted">{{ m.note }}{{ m.order_id ? ' Order #' + m.order_id : '' }}</td></tr>
-          }
+          } @empty { <tr><td colspan="7" class="empty">No movements match.</td></tr> }
         </tbody>
       </table>
     </div>

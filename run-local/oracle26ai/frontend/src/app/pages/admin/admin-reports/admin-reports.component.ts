@@ -3,6 +3,7 @@ import { Component, ElementRef, OnDestroy, OnInit, inject, signal, viewChild } f
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { ApiService, errorMessage } from '../../../core/api.service';
+import { AuthService } from '../../../core/auth.service';
 import { QuarterlyReport } from '../../../core/models';
 
 Chart.register(...registerables);
@@ -16,6 +17,7 @@ const PALETTE = ['#2f5bea', '#12a37f', '#e8833a', '#9b51e0', '#d64570', '#2bb0d6
 })
 export class AdminReportsComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
+  auth = inject(AuthService);
   report = signal<QuarterlyReport | null>(null);
   error = signal('');
   downloading = signal(false);

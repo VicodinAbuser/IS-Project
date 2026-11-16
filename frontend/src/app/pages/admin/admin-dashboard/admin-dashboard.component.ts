@@ -19,6 +19,6 @@ export class AdminDashboardComponent implements OnInit {
   ngOnInit() {
     this.api.getDashboard().subscribe(s => this.stats.set(s));
     this.api.getLowStock().subscribe(l => this.lowStock.set(l));
-    this.api.allOrders({ status: 'PAID', delivery_status: 'PACKED' }).subscribe(o => this.toShip.set(o.slice(0, 8)));
+    this.api.allOrders({ status: 'PAID', delivery_status: 'PACKED', sort: 'created_asc', limit: 8 }).subscribe(o => this.toShip.set(o));
   }
 }

@@ -1,0 +1,124 @@
+<div class="page-head">
+  <div><h1>Users &amp; access</h1><p class="muted">Registered users, their profiles, and what each profile is allowed to do</p></div>
+  @if (auth.can('USER_MANAGE')) { <button class="btn" (click)="newStaff.open = !newStaff.open">+ New staff account</button> }
+</div>
+@if (message()) { <div class="alert ok">{{ message() }}</div> }
+@if (error()) { <div class="alert error">{{ error() }}</div> }
+
+@if (newStaff.open) {
+  <form class="card mb" (ngSubmit)="createStaff()">
+    <h2>New staff account</h2>
+    <p class="muted small">Customers create their own accounts on the sign-up page. Staff accounts are created here.</p>
+    <div class="form-row">
+      <div class="field"><label for="sn">Full name</label><input id="sn" name="sn" [(ngModel)]="newStaff.name" required /></div>
+      <div class="field"><label for="se">Email (username)</label><input id="se" name="se" type="email" [(ngModel)]="newStaff.email" required /></div>
+      <div class="field"><label for="sp">First password (min 8)</label><input id="sp" name="sp" type="password" autocomplete="new-password" [(ngModel)]="newStaff.password" required /></div>
+    </div>
+    <div class="checks">
+      @for (p of staffProfiles(); track p.code) {
+        <label class="chk"><input type="checkbox" [name]="'np' + p.code" [(ngModel)]="newStaff.profiles[p.code]" /> {{ p.name }}</label>
+      }
+    </div>
+    <div class="actions"><button class="btn" type="submit">Create account</button>
+      <button class="btn secondary" type="button" (click)="newStaff.open = false">Cancel</button></div>
+  </form>
+}
+
+<div class="views">
+  <button class="btn sm" [class.secondary]="tab() !== 'users'" (click)="tab.set('users')">Users</button>
+  <button class="btn sm" [class.secondary]="tab() !== 'matrix'" (click)="tab.set('matrix')">Authorization matrix</button>
+</div>
+
+@if (tab() === 'users') {
+  <div class="card mt toolbar">
+    <div><label for="q">Search</label><input id="q" placeholder="Name, email or phone" [(ngModel)]="filter.search" (keyup.enter)="load()" /></div>
+    <div><label for="pf">Profile</label>
+      <select id="pf" [(ngModel)]="filter.profile" (ngModelChange)="load()"><option value="">All</option>
+        @for (p of profiles(); track p.code) { <option [value]="p.code">{{ p.name }}</option> }</select></div>
+    <div><label for="st">Status</label>
+      <select id="st" [(ngModel)]="filter.status" (ngModelChange)="load()"><option value="">All</option>
+        <option value="ACTIVE">Active</option><option value="DISABLED">Disabled</option><option value="LOCKED">Locked (wrong passwords)</option></select></div>
+    <div><label for="so">Sort by</label>
+      <select id="so" [(ngModel)]="filter.sort" (ngModelChange)="load()">@for (s of sorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
+    <div><label for="up">Updated</label>
+      <select id="up" [(ngModel)]="filter.updated_within_days" (ngModelChange)="load()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+    <button class="btn secondary" (click)="load()">Search</button>
+    <span class="count">{{ loading() ? 'Loading…' : users().length + ' shown' }}</span>
+  </div>
+
+  <div class="split mt">
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>User</th><th>Profiles</th><th>Status</th><th>City</th><th class="right">Orders</th><th>Last login</th><th>Updated</th><th></th></tr></thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+            <tr [class.on]="selected()?.id === u.id">
+              <td><strong>{{ u.name }}</strong><br /><span class="muted small">{{ u.email }}</span></td>
+              <td>@for (p of u.profiles; track p) { <span class="badge info">{{ label(p) }}</span> }</td>
+              <td>
+                <span class="badge" [class.success]="u.account_status === 'ACTIVE'" [class.danger]="u.account_status !== 'ACTIVE'">{{ label(u.account_status) }}</span>
+                @if (isLocked(u)) { <span class="badge warning">Locked</span> }
+              </td>
+              <td>{{ u.city }}</td>
+              <td class="right">{{ u.orders }}</td>
+              <td class="small nowrap">{{ u.last_login_at ? (u.last_login_at | date: 'dd MMM yy, HH:mm') : '—' }}</td>
+              <td class="small nowrap">{{ u.updated_at | date: 'dd MMM yy, HH:mm' }}</td>
+              <td><button class="btn secondary sm" (click)="open(u)">{{ auth.can('USER_MANAGE') ? 'Manage' : 'View' }}</button></td>
+            </tr>
+          } @empty { <tr><td colspan="8" class="empty">No users match.</td></tr> }
+        </tbody>
+      </table>
+    </div>
+
+    @if (selected(); as d) {
+      <aside class="card detail">
+        <div class="head"><h2>{{ d.name }}</h2><button class="link" (click)="selected.set(null)">Close ✕</button></div>
+        <p class="muted small">{{ d.email }} · user #{{ d.id }} · joined {{ d.created_at | date: 'dd MMM yyyy' }}</p>
+        @if (d.phone || d.city) {
+          <p class="small">{{ d.phone }}<br />{{ d.address_line }}{{ d.city ? ', ' + d.city : '' }}{{ d.pincode ? ' - ' + d.pincode : '' }}
+            @if (d.preferred_outlet) { <br /><span class="muted">Nearest outlet: {{ d.preferred_outlet }}</span> }</p>
+        }
+        @if (d.orders) { <p class="small">{{ d.orders }} orders · {{ d.total_spent | currency: 'INR' : 'symbol' : '1.0-0' }} spent</p> }
+
+        <h3>Profiles</h3>
+        <div class="checks">
+          @for (p of profiles(); track p.code) {
+            <label class="chk"><input type="checkbox" [(ngModel)]="editProfiles[p.code]" [disabled]="!auth.can('USER_MANAGE')" /> {{ p.name }}</label>
+          }
+        </div>
+        @if (auth.can('USER_MANAGE')) {
+          <div class="actions">
+            <button class="btn sm" (click)="saveProfiles()">Save profiles</button>
+            <button class="btn secondary sm" (click)="toggleStatus()">{{ d.account_status === 'ACTIVE' ? 'Disable account' : 'Enable account' }}</button>
+            @if (isLocked(d)) { <button class="btn secondary sm" (click)="unlock()">Unlock</button> }
+          </div>
+        }
+        <h3>Permissions (from these profiles)</h3>
+        <ul class="perms">@for (p of d.permissions; track p) { <li><code>{{ p }}</code></li> } @empty { <li class="muted">None</li> }</ul>
+      </aside>
+    }
+  </div>
+}
+
+@if (tab() === 'matrix') {
+  <div class="card table-wrap mt">
+    <p class="muted small">Rows are permissions (PERMISSIONS table), columns are profiles (PROFILES table); a ✓ is a row in the
+      AUTHORIZATIONS table. Users get these rights through their profiles (USER_PROFILES).</p>
+    <table class="matrix">
+      <thead>
+        <tr><th>Permission</th><th>Module</th><th>Access</th>
+          @for (p of profiles(); track p.code) { <th class="center">{{ p.name }}<br /><span class="muted small">{{ p.users }} users</span></th> }</tr>
+      </thead>
+      <tbody>
+        @for (perm of permissions(); track perm.code) {
+          <tr>
+            <td><strong>{{ perm.name }}</strong><br /><code class="small">{{ perm.code }}</code></td>
+            <td>{{ label(perm.module) }}</td>
+            <td><span class="badge">{{ perm.access_type }}</span></td>
+            @for (p of profiles(); track p.code) { <td class="center">{{ hasPermission(p, perm.code) ? '✓' : '' }}</td> }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

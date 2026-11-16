@@ -1,8 +1,9 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
-import { InventoryRow, Outlet, Product, StockMovement } from '../../../core/models';
+import { AuthService } from '../../../core/auth.service';
+import { Choice, InventoryRow, Outlet, Product, StockMovement, UPDATED_WITHIN } from '../../../core/models';
 
 type Action = 'restock' | 'adjust' | 'transfer';
 
@@ -14,15 +15,31 @@ type Action = 'restock' | 'adjust' | 'transfer';
 })
 export class AdminInventoryComponent implements OnInit {
   private api = inject(ApiService);
+  auth = inject(AuthService);
   outlets = signal<Outlet[]>([]);
   products = signal<Product[]>([]);
   rows = signal<InventoryRow[]>([]);
   summary = signal<any>(null);
   movements = signal<StockMovement[]>([]);
   view = signal<'outlet' | 'collective' | 'log'>('outlet');
-  outletFilter: number | null = null;
-  lowOnly = signal(false);
-  shownRows = computed(() => (this.lowOnly() ? this.rows().filter(r => r.low_stock) : this.rows()));
+  within = UPDATED_WITHIN;
+
+  // Stock list: filtering and sorting are done by the database (GET /api/inventory?sort=...)
+  stockFilter = { outlet_id: null as number | null, low_only: false, search: '', sort: 'outlet_asc',
+                  updated_within_days: null as number | null };
+  stockSorts: Choice[] = [
+    { value: 'outlet_asc', label: 'Outlet, then product' }, { value: 'updated_desc', label: 'Latest updated' },
+    { value: 'quantity_asc', label: 'Quantity: low to high' }, { value: 'quantity_desc', label: 'Quantity: high to low' },
+    { value: 'product_asc', label: 'Product A–Z' }, { value: 'updated_asc', label: 'Least recently updated' },
+  ];
+  // Movement log
+  logFilter = { movement_type: '', outlet_id: null as number | null, search: '', sort: 'newest',
+                updated_within_days: null as number | null, limit: 100 };
+  logSorts: Choice[] = [
+    { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' },
+    { value: 'change_desc', label: 'Biggest change' },
+  ];
+  types = ['RESTOCK', 'SALE', 'CANCEL', 'RETURN', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'MANUAL'];
 
   action: Action = 'restock';
   f = { product_id: null as number | null, outlet_id: null as number | null, to_outlet_id: null as number | null, quantity: 10, note: '' };
@@ -31,14 +48,22 @@ export class AdminInventoryComponent implements OnInit {
 
   ngOnInit() {
     this.api.getOutlets().subscribe(o => this.outlets.set(o));
-    this.api.getProducts().subscribe(p => this.products.set(p));
+    this.api.getProducts({ sort: 'name_asc' }).subscribe(p => this.products.set(p));
     this.refresh();
   }
 
   refresh() {
-    this.api.getInventory(this.outletFilter ?? undefined).subscribe(r => this.rows.set(r));
+    this.loadStock();
     this.api.getInventorySummary().subscribe(s => this.summary.set(s));
-    this.api.getMovements(100).subscribe(m => this.movements.set(m));
+    this.loadLog();
+  }
+
+  loadStock() {
+    this.api.getInventory(this.stockFilter).subscribe({ next: r => this.rows.set(r), error: e => this.error.set(errorMessage(e)) });
+  }
+
+  loadLog() {
+    this.api.getMovements(this.logFilter).subscribe({ next: m => this.movements.set(m), error: e => this.error.set(errorMessage(e)) });
   }
 
   pick(r: InventoryRow) {

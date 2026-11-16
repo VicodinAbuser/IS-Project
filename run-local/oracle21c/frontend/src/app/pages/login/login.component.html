@@ -1,36 +1,32 @@
 <div class="auth card">
   <h1>Welcome back</h1>
   <p class="muted">Sign in to the inventory management system</p>
-  @if (error()) { <div class="alert error">{{ error() }}</div> }
-  <form [formGroup]="form" (ngSubmit)="submit()">
-    <div class="field"><label for="email">Email</label><input id="email" type="email" formControlName="email" autocomplete="email" /></div>
-    <div class="field"><label for="password">Password</label><input id="password" type="password" formControlName="password" autocomplete="current-password" /></div>
+  @if (expired()) { <div class="alert warn">Your session has ended. Please sign in again.</div> }
+  @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field">
+      <label for="email">Email (username)</label>
+      <input id="email" type="email" formControlName="email" autocomplete="username" placeholder="you@example.com" />
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="pw">
+        <input id="password" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+        <button type="button" class="eye" (click)="showPassword.set(!showPassword())"
+                [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">{{ showPassword() ? '🙈' : '👁' }}</button>
+      </div>
+    </div>
     <button class="btn full" type="submit" [disabled]="form.invalid || loading()">{{ loading() ? 'Signing in…' : 'Sign in' }}</button>
   </form>
-  <div class="demo">
-    <span class="muted">Demo accounts:</span>
-    <button class="btn secondary sm" type="button" (click)="fillDemo('admin')">Admin</button>
-    <button class="btn secondary sm" type="button" (click)="fillDemo('customer')">Customer</button>
-  </div>
   <p class="muted">New customer? <a routerLink="/register">Create an account</a></p>
   <div class="server">
-    @if (editingServer()) {
-      <label for="srv">Backend address (e.g. https://abc.trycloudflare.com)</label>
-      <div class="row">
-        <input id="srv" [(ngModel)]="serverInput" placeholder="https://…" (keyup.enter)="saveServer()" />
-        <button class="btn sm" type="button" (click)="saveServer()">Save</button>
-      </div>
-      <button class="link" type="button" (click)="saveServer(true)">Use default (localhost:8000)</button>
-    } @else {
-      <span class="muted">Backend: <code>{{ server() }}</code></span>
-      @switch (serverStatus()) {
-        @case ('checking') { <span class="badge">checking…</span> }
-        @case ('ok') { <span class="badge success">connected to Oracle</span> }
-        @case ('nodb') { <span class="badge warning">backend up, Oracle not reachable</span> }
-        @case ('fail') { <span class="badge danger">backend not reachable</span> }
-      }
-      <span class="links"><button class="link" type="button" (click)="testServer()">Test</button>
-        <button class="link" type="button" (click)="editServer()">Change</button></span>
+    <span class="muted">Server:</span>
+    @switch (serverStatus()) {
+      @case ('checking') { <span class="badge">checking…</span> }
+      @case ('ok') { <span class="badge success">connected to Oracle {{ oracleVersion() }}</span> }
+      @case ('nodb') { <span class="badge warning">backend up, Oracle not reachable</span> }
+      @case ('fail') { <span class="badge danger">backend not reachable</span> }
     }
+    <button class="link" type="button" (click)="testServer()">Test again</button>
   </div>
 </div>

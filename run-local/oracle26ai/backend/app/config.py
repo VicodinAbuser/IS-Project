@@ -10,13 +10,25 @@ class Settings(BaseSettings):
     oracle_password: str = "inventory123"
     oracle_dsn: str = "localhost:1521/FREEPDB1"
 
+    # Login sessions. The signed token travels in an HttpOnly cookie, so page scripts can't read it.
     jwt_secret: str = "change-this-secret-in-production"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 120
-    # Browser origins allowed to call this API: the local Angular dev server, plus any
-    # Vercel deployment (https://<anything>.vercel.app). Add your own domain here if you use one.
-    cors_origins: list[str] = ["http://localhost:4200"]
-    cors_origin_regex: str = r"https://.*\.vercel\.app"
+    cookie_name: str = "ims_session"
+    # Secure = the browser only sends the cookie over HTTPS (http://localhost also counts as secure).
+    # Set COOKIE_SECURE=false only if you open the website on another computer over plain http.
+    cookie_secure: bool = True
+
+    # ---- Business rules (used by app/services) ----
+    payment_timeout_minutes: int = 30      # unpaid orders older than this are cancelled and their stock released
+    max_failed_logins: int = 5             # wrong passwords in a row before the account is locked ...
+    lock_minutes: int = 15                 # ... for this many minutes
+    max_items_per_order: int = 20          # different products in one order
+
+    # Browser origins allowed to call this API directly. Normally empty: the website reaches
+    # the API through the same address (/api), via the Angular dev proxy locally or the Vercel
+    # rewrite online, so no cross-origin access is needed.
+    cors_origins: list[str] = []
 
     model_config = SettingsConfigDict(env_file=".env")
 

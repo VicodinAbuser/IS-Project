@@ -1,11 +1,9 @@
 .auth { max-width: 420px; margin: 48px auto; }
 .full { width: 100%; margin-top: 4px; }
-.demo { display: flex; gap: 8px; align-items: center; margin: 18px 0 4px; font-size: 14px; }
-
+.pw { position: relative;
+  input { padding-right: 44px; }
+  .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none;
+    cursor: pointer; font-size: 16px; padding: 4px 6px; } }
 .server { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 13px;
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  code { word-break: break-all; }
-  label { width: 100%; }
-  .row { display: flex; gap: 6px; width: 100%; }
-  .links { margin-left: auto; display: flex; gap: 10px; } }
-.link { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.link { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; margin-left: auto; }

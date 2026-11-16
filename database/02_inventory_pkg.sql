@@ -1,25 +1,29 @@
 -- =====================================================================
--- 02_inventory_pkg.sql  -  Business logic inside Oracle (PL/SQL)
---   * Package INVENTORY_PKG : stored procedures used by the Python API
---   * Trigger TRG_INVENTORY_AUDIT : logs EVERY stock change automatically
---   * Views : used by the dashboard and quarterly reports
--- Run as INVENTORY after 01_schema.sql. Safe to re-run.
+-- 02_inventory_pkg.sql  -  Stored procedures, triggers and views
 --
+-- How the work is split between Python and Oracle:
+--   * The Python backend (backend/app/services/*.py) holds the BUSINESS LOGIC:
+--     who may do what, is there enough stock, may this order still be cancelled,
+--     did the payment succeed, which delivery step comes next, ...
+--     It runs each action as ONE transaction and commits or rolls back.
+--   * This package INVENTORY_PKG is the DATA-OPERATION layer the Python code calls.
+--     Each procedure does one well-defined change to the tables (lock a stock row,
+--     apply a stock change, create an order, set a payment status, ...). The
+--     procedures make no business decisions and never COMMIT: the caller does.
+--   * Triggers keep the audit log and the "last updated" times correct automatically,
+--     even for changes typed directly in SQL Developer.
+--   * Views join the tables into easy-to-read results (customer names, outlet names, ...).
+--
+-- Run as INVENTORY after 01_schema.sql. Safe to re-run.
 -- Try it in SQL Developer, e.g.:
---   EXEC inventory_pkg.restock(p_product_id => 1, p_outlet_id => 1, p_quantity => 50, p_note => 'Demo');
---   SELECT * FROM v_inventory_status WHERE product_id = 1;
---   SELECT * FROM stock_movements ORDER BY movement_id DESC FETCH FIRST 5 ROWS ONLY;
+--   EXEC inventory_pkg.apply_stock_change(1, 1, 50, 'RESTOCK', NULL, NULL, 'Demo');
+--   COMMIT;
+--   SELECT * FROM v_stock_movement_details ORDER BY movement_id DESC FETCH FIRST 5 ROWS ONLY;
 -- =====================================================================
 
 CREATE OR REPLACE PACKAGE inventory_pkg AUTHID DEFINER AS
-  -- Error codes raised to the caller. The Python API turns them into HTTP errors.
-  c_not_enough_stock CONSTANT PLS_INTEGER := -20001;   -- -> HTTP 409
-  c_not_found        CONSTANT PLS_INTEGER := -20004;   -- -> HTTP 404
-  c_invalid_state    CONSTANT PLS_INTEGER := -20009;   -- -> HTTP 409
-  c_bad_input        CONSTANT PLS_INTEGER := -20022;   -- -> HTTP 422
-
-  -- Unpaid orders older than this are cancelled automatically and their stock released.
-  c_payment_timeout_minutes CONSTANT PLS_INTEGER := 30;
+  -- Raised when the row a procedure must change does not exist. The Python API turns it into HTTP 404.
+  c_not_found CONSTANT PLS_INTEGER := -20004;
 
   -- Read by the audit trigger: WHY the stock is changing. They return NULL when someone
   -- ran a plain UPDATE, and the trigger then logs the change as MANUAL.
@@ -30,36 +34,61 @@ CREATE OR REPLACE PACKAGE inventory_pkg AUTHID DEFINER AS
   FUNCTION ctx_when          RETURN TIMESTAMP;
   PROCEDURE set_backdate(p_when IN TIMESTAMP);   -- only used by the seed script to back-date history
 
-  -- ----- Stock management (admin) -----
-  PROCEDURE restock       (p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity IN NUMBER,
-                           p_note IN VARCHAR2 DEFAULT NULL, p_user_id IN NUMBER DEFAULT NULL);
-  PROCEDURE adjust_stock  (p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
-                           p_note IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL);
-  PROCEDURE transfer_stock(p_product_id IN NUMBER, p_from_outlet_id IN NUMBER, p_to_outlet_id IN NUMBER,
-                           p_quantity IN NUMBER, p_note IN VARCHAR2 DEFAULT NULL, p_user_id IN NUMBER DEFAULT NULL);
-
-  -- ----- Orders, payment, delivery -----
-  -- p_items_json example: '[{"product_id":1,"quantity":2},{"product_id":5,"quantity":1}]'
-  PROCEDURE place_order    (p_customer_id IN NUMBER, p_outlet_id IN NUMBER, p_shipping_address IN VARCHAR2,
-                            p_items_json IN CLOB, p_order_id OUT NUMBER);
-  PROCEDURE record_payment (p_order_id IN NUMBER, p_method IN VARCHAR2, p_success IN NUMBER,
-                            p_transaction_ref IN VARCHAR2 DEFAULT NULL);
-  PROCEDURE cancel_order   (p_order_id IN NUMBER, p_user_id IN NUMBER DEFAULT NULL);
-  PROCEDURE update_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2,
-                            p_courier IN VARCHAR2 DEFAULT NULL, p_tracking_number IN VARCHAR2 DEFAULT NULL);
-  -- Cancels PENDING_PAYMENT orders older than p_older_than_minutes and returns their stock.
-  -- Called automatically at the start of every PLACE_ORDER. p_expired = how many were cancelled.
-  PROCEDURE expire_unpaid_orders(p_older_than_minutes IN NUMBER DEFAULT c_payment_timeout_minutes,
-                                 p_expired OUT NUMBER);
-
-  -- ----- Helpers -----
+  -- ----- Stock -----
+  -- Locks the stock row (SELECT ... FOR UPDATE) so nobody else can change it until the
+  -- caller commits, and returns the units on the shelf. Creates a 0 row the first time.
+  PROCEDURE lock_stock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity OUT NUMBER);
+  -- Adds p_change units (negative = removes). The trigger writes the STOCK_MOVEMENTS row.
+  PROCEDURE apply_stock_change(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
+                               p_movement_type IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL,
+                               p_order_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL);
+  -- Puts every item of an order back on its outlet's shelf (movement type CANCEL or RETURN).
+  PROCEDURE restore_order_stock(p_order_id IN NUMBER, p_movement_type IN VARCHAR2,
+                                p_user_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL);
   FUNCTION stock_at   (p_product_id IN NUMBER, p_outlet_id IN NUMBER) RETURN NUMBER;
   FUNCTION total_stock(p_product_id IN NUMBER) RETURN NUMBER;
 
-  -- Core rule used by all procedures above (does not commit).
-  PROCEDURE change_stock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
-                         p_movement_type IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL,
-                         p_order_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL);
+  -- ----- Orders, payments, deliveries -----
+  PROCEDURE create_order(p_customer_id IN NUMBER, p_outlet_id IN NUMBER, p_shipping_address IN VARCHAR2,
+                         p_order_id OUT NUMBER);
+  PROCEDURE add_order_item(p_order_id IN NUMBER, p_product_id IN NUMBER, p_quantity IN NUMBER, p_unit_price IN NUMBER);
+  -- Sets the order total and opens its PENDING payment and NOT_SHIPPED delivery.
+  PROCEDURE open_payment_and_delivery(p_order_id IN NUMBER, p_total_amount IN NUMBER);
+  -- Locks the order (so two requests can't change it at once) and returns its current state.
+  PROCEDURE lock_order(p_order_id IN NUMBER, p_customer_id OUT NUMBER, p_outlet_id OUT NUMBER,
+                       p_order_status OUT VARCHAR2, p_payment_status OUT VARCHAR2,
+                       p_delivery_status OUT VARCHAR2, p_created_at OUT TIMESTAMP);
+  PROCEDURE set_order_status(p_order_id IN NUMBER, p_status IN VARCHAR2);
+  PROCEDURE set_payment(p_order_id IN NUMBER, p_status IN VARCHAR2, p_method IN VARCHAR2 DEFAULT NULL,
+                        p_transaction_ref IN VARCHAR2 DEFAULT NULL);
+  PROCEDURE set_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2, p_courier IN VARCHAR2 DEFAULT NULL,
+                         p_tracking_number IN VARCHAR2 DEFAULT NULL);
+
+  -- ----- Users and access -----
+  PROCEDURE create_user(p_full_name IN VARCHAR2, p_email IN VARCHAR2, p_password_hash IN VARCHAR2,
+                        p_user_id OUT NUMBER);
+  -- Inserts or updates the customer's personal details (MERGE).
+  PROCEDURE save_customer_profile(p_customer_id IN NUMBER, p_phone IN VARCHAR2, p_address_line IN VARCHAR2,
+                                  p_city IN VARCHAR2, p_state IN VARCHAR2, p_pincode IN VARCHAR2,
+                                  p_preferred_outlet_id IN NUMBER);
+  PROCEDURE assign_profile(p_user_id IN NUMBER, p_profile_code IN VARCHAR2, p_assigned_by IN NUMBER DEFAULT NULL);
+  PROCEDURE revoke_profile(p_user_id IN NUMBER, p_profile_code IN VARCHAR2);
+  PROCEDURE set_account_status(p_user_id IN NUMBER, p_status IN VARCHAR2);
+  PROCEDURE update_user_name(p_user_id IN NUMBER, p_full_name IN VARCHAR2);
+  -- Marks the user as changed now (e.g. after their profiles changed), for "latest updated" lists.
+  PROCEDURE touch_user(p_user_id IN NUMBER);
+  PROCEDURE record_login_success(p_user_id IN NUMBER);
+  PROCEDURE record_login_failure(p_user_id IN NUMBER, p_locked_until IN TIMESTAMP DEFAULT NULL);
+  PROCEDURE unlock_user(p_user_id IN NUMBER);
+
+  -- ----- Catalogue -----
+  -- p_product_id NULL = create a new product (its id is returned), otherwise update it.
+  PROCEDURE save_product(p_product_id IN OUT NUMBER, p_sku IN VARCHAR2, p_name IN VARCHAR2,
+                         p_description IN VARCHAR2, p_price IN NUMBER, p_image_url IN VARCHAR2,
+                         p_reorder_level IN NUMBER, p_is_active IN NUMBER, p_category_id IN NUMBER,
+                         p_supplier_id IN NUMBER);
+  PROCEDURE set_product_active(p_product_id IN NUMBER, p_is_active IN NUMBER);
+  PROCEDURE create_outlet(p_name IN VARCHAR2, p_city IN VARCHAR2, p_address IN VARCHAR2, p_outlet_id OUT NUMBER);
 END inventory_pkg;
 /
 
@@ -84,24 +113,19 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
     g_movement_type := NULL; g_user_id := NULL; g_order_id := NULL; g_note := NULL;
   END clear_context;
 
-  PROCEDURE assert_exists(p_table IN VARCHAR2, p_id IN NUMBER) IS
-    v_count PLS_INTEGER;
+  PROCEDURE not_found_if_none(p_what IN VARCHAR2) IS
   BEGIN
-    IF p_table = 'PRODUCT' THEN
-      SELECT COUNT(*) INTO v_count FROM products WHERE product_id = p_id;
-    ELSIF p_table = 'OUTLET' THEN
-      SELECT COUNT(*) INTO v_count FROM outlets WHERE outlet_id = p_id;
+    IF SQL%ROWCOUNT = 0 THEN
+      RAISE_APPLICATION_ERROR(c_not_found, p_what || ' not found');
     END IF;
-    IF v_count = 0 THEN
-      RAISE_APPLICATION_ERROR(c_not_found, INITCAP(p_table) || ' ' || p_id || ' not found');
-    END IF;
-  END assert_exists;
+  END not_found_if_none;
 
+  -- ------------------------------------------------------------- stock
   FUNCTION stock_at(p_product_id IN NUMBER, p_outlet_id IN NUMBER) RETURN NUMBER IS
     v_qty NUMBER;
   BEGIN
-    SELECT NVL(MAX(quantity), 0) INTO v_qty
-      FROM inventory WHERE product_id = p_product_id AND outlet_id = p_outlet_id;
+    SELECT NVL(MAX(quantity), 0) INTO v_qty FROM inventory
+     WHERE product_id = p_product_id AND outlet_id = p_outlet_id;
     RETURN v_qty;
   END stock_at;
 
@@ -112,299 +136,227 @@ CREATE OR REPLACE PACKAGE BODY inventory_pkg AS
     RETURN v_qty;
   END total_stock;
 
-  PROCEDURE change_stock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
-                         p_movement_type IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL,
-                         p_order_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL) IS
-    v_qty  inventory.quantity%TYPE;
-    v_name products.name%TYPE;
+  PROCEDURE lock_stock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity OUT NUMBER) IS
   BEGIN
-    assert_exists('PRODUCT', p_product_id);
-    assert_exists('OUTLET', p_outlet_id);
+    SELECT quantity INTO p_quantity FROM inventory
+     WHERE product_id = p_product_id AND outlet_id = p_outlet_id
+       FOR UPDATE;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN      -- first time this product is stocked at this outlet
+      INSERT INTO inventory (product_id, outlet_id, quantity) VALUES (p_product_id, p_outlet_id, 0);
+      p_quantity := 0;
+  END lock_stock;
 
-    -- Lock this stock row so two buyers can't take the last unit at the same time.
-    BEGIN
-      SELECT quantity INTO v_qty FROM inventory
-       WHERE product_id = p_product_id AND outlet_id = p_outlet_id
-         FOR UPDATE;
-    EXCEPTION
-      WHEN NO_DATA_FOUND THEN      -- first time this product is stocked at this outlet
-        INSERT INTO inventory (product_id, outlet_id, quantity) VALUES (p_product_id, p_outlet_id, 0);
-        v_qty := 0;
-    END;
-
-    IF v_qty + p_change < 0 THEN
-      SELECT name INTO v_name FROM products WHERE product_id = p_product_id;
-      RAISE_APPLICATION_ERROR(c_not_enough_stock,
-        'Not enough stock for ''' || v_name || ''' at this outlet (available: ' || v_qty || ')');
-    END IF;
-
+  PROCEDURE apply_stock_change(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
+                               p_movement_type IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL,
+                               p_order_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL) IS
+    v_qty NUMBER;
+  BEGIN
+    lock_stock(p_product_id, p_outlet_id, v_qty);
     -- Tell the audit trigger why this change is happening, then update.
+    -- (If the result would be below 0, the CHECK constraint on INVENTORY.QUANTITY refuses it.)
     g_movement_type := p_movement_type; g_user_id := p_user_id; g_order_id := p_order_id; g_note := p_note;
     UPDATE inventory
-       SET quantity = quantity + p_change, updated_at = SYSTIMESTAMP
+       SET quantity = quantity + p_change, updated_at = NVL(g_when, SYSTIMESTAMP)
      WHERE product_id = p_product_id AND outlet_id = p_outlet_id;
     clear_context;
   EXCEPTION
     WHEN OTHERS THEN clear_context; RAISE;
-  END change_stock;
+  END apply_stock_change;
 
-  -- Put every item of an order back on its outlet's shelf (no commit).
-  PROCEDURE return_items_to_stock(p_order_id IN NUMBER, p_outlet_id IN NUMBER, p_movement_type IN VARCHAR2,
-                                  p_user_id IN NUMBER, p_note IN VARCHAR2) IS
+  PROCEDURE restore_order_stock(p_order_id IN NUMBER, p_movement_type IN VARCHAR2,
+                                p_user_id IN NUMBER DEFAULT NULL, p_note IN VARCHAR2 DEFAULT NULL) IS
   BEGIN
-    FOR item IN (SELECT product_id, quantity FROM order_items WHERE order_id = p_order_id ORDER BY product_id) LOOP
-      change_stock(item.product_id, p_outlet_id, item.quantity, p_movement_type, p_user_id, p_order_id, p_note);
+    -- Sorted by product so two transactions always lock rows in the same order (no deadlocks).
+    FOR item IN (SELECT oi.product_id, oi.quantity, o.outlet_id
+                   FROM order_items oi JOIN orders o ON o.order_id = oi.order_id
+                  WHERE oi.order_id = p_order_id ORDER BY oi.product_id) LOOP
+      apply_stock_change(item.product_id, item.outlet_id, item.quantity, p_movement_type, p_user_id, p_order_id, p_note);
     END LOOP;
-  END return_items_to_stock;
+  END restore_order_stock;
 
-  -- Cancel one order that hasn't shipped (no commit). Used by cancel_order and expire_unpaid_orders.
-  PROCEDURE do_cancel(p_order_id IN NUMBER, p_outlet_id IN NUMBER, p_user_id IN NUMBER, p_note IN VARCHAR2) IS
+  -- ------------------------------------------------------------- orders
+  PROCEDURE create_order(p_customer_id IN NUMBER, p_outlet_id IN NUMBER, p_shipping_address IN VARCHAR2,
+                         p_order_id OUT NUMBER) IS
   BEGIN
-    return_items_to_stock(p_order_id, p_outlet_id, 'CANCEL', p_user_id, p_note);
-    -- Paid -> the money goes back (REFUNDED); never paid -> the open payment is closed (CANCELLED).
-    UPDATE payments
-       SET payment_status = CASE payment_status WHEN 'SUCCESS' THEN 'REFUNDED' ELSE 'CANCELLED' END,
-           updated_at = SYSTIMESTAMP
-     WHERE order_id = p_order_id AND payment_status IN ('SUCCESS', 'PENDING', 'FAILED');
-    UPDATE orders SET order_status = 'CANCELLED' WHERE order_id = p_order_id;
-  END do_cancel;
-
-  PROCEDURE restock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_quantity IN NUMBER,
-                    p_note IN VARCHAR2 DEFAULT NULL, p_user_id IN NUMBER DEFAULT NULL) IS
-  BEGIN
-    IF p_quantity IS NULL OR p_quantity <= 0 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Quantity must be greater than 0');
-    END IF;
-    change_stock(p_product_id, p_outlet_id, p_quantity, 'RESTOCK', p_user_id, NULL,
-                 NVL(p_note, 'New stock received'));
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END restock;
-
-  PROCEDURE adjust_stock(p_product_id IN NUMBER, p_outlet_id IN NUMBER, p_change IN NUMBER,
-                         p_note IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL) IS
-  BEGIN
-    IF NVL(p_change, 0) = 0 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Change cannot be 0');
-    END IF;
-    IF LENGTH(TRIM(p_note)) IS NULL OR LENGTH(TRIM(p_note)) < 3 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'A reason (note) is required for adjustments');
-    END IF;
-    change_stock(p_product_id, p_outlet_id, p_change, 'ADJUSTMENT', p_user_id, NULL, p_note);
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END adjust_stock;
-
-  PROCEDURE transfer_stock(p_product_id IN NUMBER, p_from_outlet_id IN NUMBER, p_to_outlet_id IN NUMBER,
-                           p_quantity IN NUMBER, p_note IN VARCHAR2 DEFAULT NULL, p_user_id IN NUMBER DEFAULT NULL) IS
-  BEGIN
-    IF p_from_outlet_id = p_to_outlet_id THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Choose two different outlets');
-    END IF;
-    IF p_quantity IS NULL OR p_quantity <= 0 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Quantity must be greater than 0');
-    END IF;
-    -- Both steps are in ONE transaction: either both happen or neither does.
-    change_stock(p_product_id, p_from_outlet_id, -p_quantity, 'TRANSFER_OUT', p_user_id, NULL, p_note);
-    change_stock(p_product_id, p_to_outlet_id,    p_quantity, 'TRANSFER_IN',  p_user_id, NULL, p_note);
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END transfer_stock;
-
-  PROCEDURE place_order(p_customer_id IN NUMBER, p_outlet_id IN NUMBER, p_shipping_address IN VARCHAR2,
-                        p_items_json IN CLOB, p_order_id OUT NUMBER) IS
-    v_price  products.price%TYPE;
-    v_active products.is_active%TYPE;
-    v_total   NUMBER := 0;
-    v_lines   PLS_INTEGER := 0;
-    v_expired NUMBER;
-  BEGIN
-    assert_exists('OUTLET', p_outlet_id);
-    -- First release stock held by abandoned checkouts, then check availability.
-    expire_unpaid_orders(c_payment_timeout_minutes, v_expired);
-    IF LENGTH(TRIM(p_shipping_address)) IS NULL OR LENGTH(TRIM(p_shipping_address)) < 5 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Shipping address is too short');
-    END IF;
-
     INSERT INTO orders (customer_id, outlet_id, shipping_address)
     VALUES (p_customer_id, p_outlet_id, p_shipping_address)
     RETURNING order_id INTO p_order_id;
+  END create_order;
 
-    -- Read the cart from JSON; duplicates are merged. Sorted by product to avoid deadlocks.
-    FOR item IN (
-      SELECT product_id, SUM(quantity) AS quantity
-        FROM JSON_TABLE(p_items_json, '$[*]'
-               COLUMNS (product_id NUMBER PATH '$.product_id',
-                        quantity   NUMBER PATH '$.quantity'))
-       GROUP BY product_id
-       ORDER BY product_id
-    ) LOOP
-      IF item.product_id IS NULL OR NVL(item.quantity, 0) <= 0 THEN
-        RAISE_APPLICATION_ERROR(c_bad_input, 'Each item needs a product_id and a quantity above 0');
-      END IF;
-      BEGIN
-        SELECT price, is_active INTO v_price, v_active FROM products WHERE product_id = item.product_id;
-      EXCEPTION
-        WHEN NO_DATA_FOUND THEN v_active := 0;
-      END;
-      IF v_active = 0 THEN
-        RAISE_APPLICATION_ERROR(c_not_found, 'Product ' || item.product_id || ' not available');
-      END IF;
+  PROCEDURE add_order_item(p_order_id IN NUMBER, p_product_id IN NUMBER, p_quantity IN NUMBER, p_unit_price IN NUMBER) IS
+  BEGIN
+    INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (p_order_id, p_product_id, p_quantity, p_unit_price);
+  END add_order_item;
 
-      change_stock(item.product_id, p_outlet_id, -item.quantity, 'SALE', p_customer_id, p_order_id,
-                   'Order #' || p_order_id);
-      INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-      VALUES (p_order_id, item.product_id, item.quantity, v_price);
-      v_total := v_total + v_price * item.quantity;
-      v_lines := v_lines + 1;
-    END LOOP;
-
-    IF v_lines = 0 THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Order has no items');
-    END IF;
-
-    UPDATE orders SET total_amount = v_total WHERE order_id = p_order_id;
-    INSERT INTO payments   (order_id, amount) VALUES (p_order_id, v_total);
+  PROCEDURE open_payment_and_delivery(p_order_id IN NUMBER, p_total_amount IN NUMBER) IS
+  BEGIN
+    UPDATE orders SET total_amount = p_total_amount WHERE order_id = p_order_id;
+    not_found_if_none('Order');
+    INSERT INTO payments   (order_id, amount) VALUES (p_order_id, p_total_amount);
     INSERT INTO deliveries (order_id)         VALUES (p_order_id);
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-      ROLLBACK;            -- all or nothing: no half-placed orders, no lost stock
-      p_order_id := NULL;
-      RAISE;
-  END place_order;
+  END open_payment_and_delivery;
 
-  PROCEDURE record_payment(p_order_id IN NUMBER, p_method IN VARCHAR2, p_success IN NUMBER,
-                           p_transaction_ref IN VARCHAR2 DEFAULT NULL) IS
-    v_status orders.order_status%TYPE;
+  PROCEDURE lock_order(p_order_id IN NUMBER, p_customer_id OUT NUMBER, p_outlet_id OUT NUMBER,
+                       p_order_status OUT VARCHAR2, p_payment_status OUT VARCHAR2,
+                       p_delivery_status OUT VARCHAR2, p_created_at OUT TIMESTAMP) IS
   BEGIN
-    BEGIN
-      SELECT order_status INTO v_status FROM orders WHERE order_id = p_order_id FOR UPDATE;
-    EXCEPTION
-      WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Order not found');
-    END;
-    IF v_status <> 'PENDING_PAYMENT' THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Order is ' || v_status || ', cannot pay');
-    END IF;
-
-    IF p_success = 1 THEN
-      UPDATE payments
-         SET payment_status = 'SUCCESS', payment_method = p_method, updated_at = SYSTIMESTAMP,
-             transaction_ref = NVL(p_transaction_ref, 'TXN-' || SUBSTR(RAWTOHEX(SYS_GUID()), 1, 12))
-       WHERE order_id = p_order_id;
-      UPDATE orders     SET order_status = 'PAID' WHERE order_id = p_order_id;
-      UPDATE deliveries SET delivery_status = 'PACKED', updated_at = SYSTIMESTAMP WHERE order_id = p_order_id;
-    ELSE
-      -- Declined: order stays PENDING_PAYMENT so the customer can try again.
-      UPDATE payments SET payment_status = 'FAILED', payment_method = p_method, updated_at = SYSTIMESTAMP
-       WHERE order_id = p_order_id;
-    END IF;
-    COMMIT;
+    SELECT o.customer_id, o.outlet_id, o.order_status, p.payment_status, d.delivery_status, o.created_at
+      INTO p_customer_id, p_outlet_id, p_order_status, p_payment_status, p_delivery_status, p_created_at
+      FROM orders o
+      JOIN payments p   ON p.order_id = o.order_id
+      JOIN deliveries d ON d.order_id = o.order_id
+     WHERE o.order_id = p_order_id
+       FOR UPDATE OF o.order_status;
   EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END record_payment;
+    WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Order not found');
+  END lock_order;
 
-  PROCEDURE cancel_order(p_order_id IN NUMBER, p_user_id IN NUMBER DEFAULT NULL) IS
-    v_status   orders.order_status%TYPE;
-    v_outlet   orders.outlet_id%TYPE;
-    v_delivery deliveries.delivery_status%TYPE;
+  PROCEDURE set_order_status(p_order_id IN NUMBER, p_status IN VARCHAR2) IS
   BEGIN
-    BEGIN
-      SELECT o.order_status, o.outlet_id, d.delivery_status INTO v_status, v_outlet, v_delivery
-        FROM orders o JOIN deliveries d ON d.order_id = o.order_id
-       WHERE o.order_id = p_order_id
-         FOR UPDATE OF o.order_status;
-    EXCEPTION
-      WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Order not found');
-    END;
-    IF v_status = 'CANCELLED' THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Order already cancelled');
-    END IF;
-    IF v_delivery NOT IN ('NOT_SHIPPED', 'PACKED') THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Order already shipped, cannot cancel');
-    END IF;
+    UPDATE orders SET order_status = p_status WHERE order_id = p_order_id;
+    not_found_if_none('Order');
+  END set_order_status;
 
-    do_cancel(p_order_id, v_outlet, p_user_id, 'Order #' || p_order_id || ' cancelled');
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END cancel_order;
-
-  PROCEDURE update_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2,
-                            p_courier IN VARCHAR2 DEFAULT NULL, p_tracking_number IN VARCHAR2 DEFAULT NULL) IS
-    v_status  orders.order_status%TYPE;
-    v_outlet  orders.outlet_id%TYPE;
-    v_current deliveries.delivery_status%TYPE;
-
-    -- Position in the delivery journey; a delivery may only move forward.
-    FUNCTION step(p IN VARCHAR2) RETURN PLS_INTEGER IS
-    BEGIN
-      RETURN CASE p WHEN 'NOT_SHIPPED' THEN 0 WHEN 'PACKED' THEN 1 WHEN 'SHIPPED' THEN 2
-                    WHEN 'OUT_FOR_DELIVERY' THEN 3 WHEN 'DELIVERED' THEN 4 WHEN 'RETURNED' THEN 5 END;
-    END step;
+  PROCEDURE set_payment(p_order_id IN NUMBER, p_status IN VARCHAR2, p_method IN VARCHAR2 DEFAULT NULL,
+                        p_transaction_ref IN VARCHAR2 DEFAULT NULL) IS
   BEGIN
-    BEGIN
-      SELECT o.order_status, o.outlet_id, d.delivery_status INTO v_status, v_outlet, v_current
-        FROM orders o JOIN deliveries d ON d.order_id = o.order_id
-       WHERE o.order_id = p_order_id
-         FOR UPDATE OF o.order_status;
-    EXCEPTION
-      WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Order not found');
-    END;
-    IF v_status <> 'PAID' THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Only paid orders can be shipped (this order is ' || v_status || ')');
-    END IF;
-    IF step(p_status) IS NULL THEN
-      RAISE_APPLICATION_ERROR(c_bad_input, 'Unknown delivery status ' || p_status);
-    END IF;
-    IF step(p_status) < step(v_current) THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Delivery cannot go back from ' || v_current || ' to ' || p_status);
-    END IF;
-    IF p_status = 'RETURNED' AND v_current NOT IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED') THEN
-      RAISE_APPLICATION_ERROR(c_invalid_state, 'Only shipped orders can be returned; cancel it instead');
-    END IF;
+    UPDATE payments
+       SET payment_status  = p_status,
+           payment_method  = NVL(p_method, payment_method),
+           transaction_ref = NVL(p_transaction_ref, transaction_ref)
+     WHERE order_id = p_order_id;
+    not_found_if_none('Payment');
+  END set_payment;
 
+  PROCEDURE set_delivery(p_order_id IN NUMBER, p_status IN VARCHAR2, p_courier IN VARCHAR2 DEFAULT NULL,
+                         p_tracking_number IN VARCHAR2 DEFAULT NULL) IS
+  BEGIN
     UPDATE deliveries
        SET delivery_status = p_status,
            courier         = NVL(p_courier, courier),
-           tracking_number = NVL(p_tracking_number, tracking_number),
-           updated_at      = SYSTIMESTAMP
+           tracking_number = NVL(p_tracking_number, tracking_number)
      WHERE order_id = p_order_id;
+    not_found_if_none('Delivery');
+  END set_delivery;
 
-    IF p_status = 'RETURNED' THEN
-      -- Goods came back: restock them at the outlet and refund the customer.
-      return_items_to_stock(p_order_id, v_outlet, 'RETURN', NULL, 'Order #' || p_order_id || ' returned');
-      UPDATE payments SET payment_status = 'REFUNDED', updated_at = SYSTIMESTAMP
-       WHERE order_id = p_order_id AND payment_status = 'SUCCESS';
-      UPDATE orders SET order_status = 'RETURNED' WHERE order_id = p_order_id;
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN ROLLBACK; RAISE;
-  END update_delivery;
-
-  PROCEDURE expire_unpaid_orders(p_older_than_minutes IN NUMBER DEFAULT c_payment_timeout_minutes,
-                                 p_expired OUT NUMBER) IS
+  -- ------------------------------------------------------------- users and access
+  PROCEDURE create_user(p_full_name IN VARCHAR2, p_email IN VARCHAR2, p_password_hash IN VARCHAR2,
+                        p_user_id OUT NUMBER) IS
   BEGIN
-    p_expired := 0;
-    FOR o IN (SELECT order_id, outlet_id FROM orders
-               WHERE order_status = 'PENDING_PAYMENT'
-                 AND created_at < CAST(SYSTIMESTAMP AS TIMESTAMP)   -- same type as the column, so the index is usable
-                                  - NUMTODSINTERVAL(p_older_than_minutes, 'MINUTE')
-               ORDER BY order_id
-                 FOR UPDATE SKIP LOCKED) LOOP     -- skip an order someone is paying for right now
-      do_cancel(o.order_id, o.outlet_id, NULL,
-                'Order #' || o.order_id || ' not paid within ' || p_older_than_minutes || ' minutes');
-      p_expired := p_expired + 1;
-    END LOOP;
-    -- No COMMIT here: the caller (e.g. PLACE_ORDER) commits it with its own work.
-  END expire_unpaid_orders;
+    INSERT INTO users (full_name, email, password_hash)
+    VALUES (p_full_name, LOWER(p_email), p_password_hash)
+    RETURNING user_id INTO p_user_id;
+  END create_user;
+
+  PROCEDURE save_customer_profile(p_customer_id IN NUMBER, p_phone IN VARCHAR2, p_address_line IN VARCHAR2,
+                                  p_city IN VARCHAR2, p_state IN VARCHAR2, p_pincode IN VARCHAR2,
+                                  p_preferred_outlet_id IN NUMBER) IS
+  BEGIN
+    MERGE INTO customer_profiles c
+    USING (SELECT p_customer_id AS customer_id FROM dual) s
+       ON (c.customer_id = s.customer_id)
+     WHEN MATCHED THEN UPDATE
+          SET phone = p_phone, address_line = p_address_line, city = p_city, state = p_state,
+              pincode = p_pincode, preferred_outlet_id = p_preferred_outlet_id
+     WHEN NOT MATCHED THEN INSERT (customer_id, phone, address_line, city, state, pincode, preferred_outlet_id)
+          VALUES (p_customer_id, p_phone, p_address_line, p_city, p_state, p_pincode, p_preferred_outlet_id);
+  END save_customer_profile;
+
+  PROCEDURE assign_profile(p_user_id IN NUMBER, p_profile_code IN VARCHAR2, p_assigned_by IN NUMBER DEFAULT NULL) IS
+    v_profile_id profiles.profile_id%TYPE;
+  BEGIN
+    SELECT profile_id INTO v_profile_id FROM profiles WHERE profile_code = p_profile_code;
+    INSERT INTO user_profiles (user_id, profile_id, assigned_by)
+    SELECT p_user_id, v_profile_id, p_assigned_by FROM dual
+     WHERE NOT EXISTS (SELECT 1 FROM user_profiles WHERE user_id = p_user_id AND profile_id = v_profile_id);
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(c_not_found, 'Profile ' || p_profile_code || ' not found');
+  END assign_profile;
+
+  PROCEDURE revoke_profile(p_user_id IN NUMBER, p_profile_code IN VARCHAR2) IS
+  BEGIN
+    DELETE FROM user_profiles
+     WHERE user_id = p_user_id
+       AND profile_id = (SELECT profile_id FROM profiles WHERE profile_code = p_profile_code);
+  END revoke_profile;
+
+  PROCEDURE set_account_status(p_user_id IN NUMBER, p_status IN VARCHAR2) IS
+  BEGIN
+    UPDATE users SET account_status = p_status WHERE user_id = p_user_id;
+    not_found_if_none('User');
+  END set_account_status;
+
+  PROCEDURE update_user_name(p_user_id IN NUMBER, p_full_name IN VARCHAR2) IS
+  BEGIN
+    UPDATE users SET full_name = p_full_name WHERE user_id = p_user_id;
+    not_found_if_none('User');
+  END update_user_name;
+
+  PROCEDURE touch_user(p_user_id IN NUMBER) IS
+  BEGIN
+    UPDATE users SET updated_at = SYSTIMESTAMP WHERE user_id = p_user_id;
+  END touch_user;
+
+  PROCEDURE record_login_success(p_user_id IN NUMBER) IS
+  BEGIN
+    UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = SYSTIMESTAMP
+     WHERE user_id = p_user_id;
+  END record_login_success;
+
+  PROCEDURE record_login_failure(p_user_id IN NUMBER, p_locked_until IN TIMESTAMP DEFAULT NULL) IS
+  BEGIN
+    UPDATE users
+       SET failed_login_count = CASE WHEN p_locked_until IS NULL THEN failed_login_count + 1 ELSE 0 END,
+           locked_until       = p_locked_until
+     WHERE user_id = p_user_id;
+  END record_login_failure;
+
+  PROCEDURE unlock_user(p_user_id IN NUMBER) IS
+  BEGIN
+    UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE user_id = p_user_id;
+    not_found_if_none('User');
+  END unlock_user;
+
+  -- ------------------------------------------------------------- catalogue
+  PROCEDURE save_product(p_product_id IN OUT NUMBER, p_sku IN VARCHAR2, p_name IN VARCHAR2,
+                         p_description IN VARCHAR2, p_price IN NUMBER, p_image_url IN VARCHAR2,
+                         p_reorder_level IN NUMBER, p_is_active IN NUMBER, p_category_id IN NUMBER,
+                         p_supplier_id IN NUMBER) IS
+  BEGIN
+    IF p_product_id IS NULL THEN
+      INSERT INTO products (sku, name, description, price, image_url, reorder_level, is_active, category_id, supplier_id)
+      VALUES (p_sku, p_name, p_description, p_price, p_image_url, p_reorder_level, p_is_active, p_category_id, p_supplier_id)
+      RETURNING product_id INTO p_product_id;
+    ELSE
+      UPDATE products
+         SET sku = p_sku, name = p_name, description = p_description, price = p_price, image_url = p_image_url,
+             reorder_level = p_reorder_level, is_active = p_is_active, category_id = p_category_id,
+             supplier_id = p_supplier_id
+       WHERE product_id = p_product_id;
+      not_found_if_none('Product');
+    END IF;
+  END save_product;
+
+  PROCEDURE set_product_active(p_product_id IN NUMBER, p_is_active IN NUMBER) IS
+  BEGIN
+    UPDATE products SET is_active = p_is_active WHERE product_id = p_product_id;
+    not_found_if_none('Product');
+  END set_product_active;
+
+  PROCEDURE create_outlet(p_name IN VARCHAR2, p_city IN VARCHAR2, p_address IN VARCHAR2, p_outlet_id OUT NUMBER) IS
+  BEGIN
+    INSERT INTO outlets (name, city, address) VALUES (p_name, p_city, p_address)
+    RETURNING outlet_id INTO p_outlet_id;
+  END create_outlet;
 
 END inventory_pkg;
 /
+
+-- =====================================================================
+-- Triggers
+-- =====================================================================
 
 -- Every change to INVENTORY.QUANTITY is written to STOCK_MOVEMENTS, even a manual
 -- UPDATE typed in SQL Developer (logged as MANUAL), so the history can't be skipped.
@@ -427,12 +379,68 @@ BEGIN
 END;
 /
 
--- ---------- Views ----------
+-- "Last updated" times: any UPDATE of these rows stamps UPDATED_AT, unless the statement
+-- sets UPDATED_AT itself. The admin and customer screens sort by these columns.
+-- For USERS only real account changes count (name, email, password, status), not a login.
+CREATE OR REPLACE TRIGGER trg_users_updated
+BEFORE UPDATE OF full_name, email, password_hash, account_status ON users FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_custprof_updated
+BEFORE UPDATE ON customer_profiles FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_products_updated
+BEFORE UPDATE ON products FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_orders_updated
+BEFORE UPDATE ON orders FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+-- A change to a payment or delivery also counts as a change to its order,
+-- so "latest updated" order lists show it at the top.
+CREATE OR REPLACE TRIGGER trg_payments_updated
+BEFORE UPDATE ON payments FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_payments_touch_order
+AFTER UPDATE ON payments FOR EACH ROW
+BEGIN
+  UPDATE orders SET updated_at = :NEW.updated_at WHERE order_id = :NEW.order_id AND updated_at < :NEW.updated_at;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_deliveries_updated
+BEFORE UPDATE ON deliveries FOR EACH ROW
+BEGIN
+  IF NOT UPDATING('UPDATED_AT') THEN :NEW.updated_at := NVL(inventory_pkg.ctx_when, SYSTIMESTAMP); END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER trg_deliveries_touch_order
+AFTER UPDATE ON deliveries FOR EACH ROW
+BEGIN
+  UPDATE orders SET updated_at = :NEW.updated_at WHERE order_id = :NEW.order_id AND updated_at < :NEW.updated_at;
+END;
+/
+
+-- =====================================================================
+-- Views used by the application
+-- =====================================================================
 CREATE OR REPLACE VIEW v_inventory_status AS
 SELECT i.product_id, p.sku, p.name AS product_name, i.outlet_id, o.name AS outlet_name,
        i.quantity, p.reorder_level,
        CASE WHEN i.quantity <= p.reorder_level THEN 1 ELSE 0 END AS low_stock,
-       p.price, i.quantity * p.price AS stock_value
+       p.price, i.quantity * p.price AS stock_value, i.updated_at
   FROM inventory i
   JOIN products p ON p.product_id = i.product_id
   JOIN outlets  o ON o.outlet_id  = i.outlet_id
@@ -471,3 +479,85 @@ SELECT sales_year, sales_quarter, outlet_name,
        SUM(revenue)             AS revenue
   FROM v_sales_lines
  GROUP BY sales_year, sales_quarter, outlet_name;
+
+-- =====================================================================
+-- Readable views for SQL Developer: names instead of ID numbers
+-- =====================================================================
+
+-- Every order with the customer's name, the outlet, payment and delivery in one row.
+CREATE OR REPLACE VIEW v_order_details AS
+SELECT o.order_id, o.created_at AS order_date, o.updated_at AS last_updated, o.order_status,
+       o.customer_id, u.full_name AS customer_name, u.email AS customer_email, cp.phone AS customer_phone,
+       o.outlet_id, ou.name AS outlet_name, ou.city AS outlet_city,
+       (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.order_id)           AS item_lines,
+       (SELECT NVL(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.order_id) AS units,
+       o.total_amount,
+       p.payment_status, p.payment_method, p.transaction_ref, p.updated_at AS payment_updated,
+       d.delivery_status, d.courier, d.tracking_number, d.updated_at AS delivery_updated,
+       o.shipping_address
+  FROM orders o
+  JOIN users u        ON u.user_id = o.customer_id
+  LEFT JOIN customer_profiles cp ON cp.customer_id = o.customer_id
+  JOIN outlets ou     ON ou.outlet_id = o.outlet_id
+  LEFT JOIN payments p   ON p.order_id = o.order_id
+  LEFT JOIN deliveries d ON d.order_id = o.order_id;
+
+-- Every product line of every order, with names.
+CREATE OR REPLACE VIEW v_order_item_details AS
+SELECT oi.order_item_id, oi.order_id, o.created_at AS order_date, o.order_status,
+       u.full_name AS customer_name, ou.name AS outlet_name,
+       p.sku, p.name AS product_name, NVL(c.name, 'Uncategorised') AS category_name,
+       oi.quantity, oi.unit_price, oi.quantity * oi.unit_price AS line_total
+  FROM order_items oi
+  JOIN orders o    ON o.order_id = oi.order_id
+  JOIN users u     ON u.user_id = o.customer_id
+  JOIN outlets ou  ON ou.outlet_id = o.outlet_id
+  JOIN products p  ON p.product_id = oi.product_id
+  LEFT JOIN categories c ON c.category_id = p.category_id;
+
+-- The stock audit log with product, outlet and user names.
+CREATE OR REPLACE VIEW v_stock_movement_details AS
+SELECT m.movement_id, m.created_at, m.movement_type, m.qty_change,
+       p.sku, p.name AS product_name, o.name AS outlet_name,
+       m.order_id, m.user_id, u.full_name AS changed_by, m.note
+  FROM stock_movements m
+  JOIN products p ON p.product_id = m.product_id
+  JOIN outlets o  ON o.outlet_id  = m.outlet_id
+  LEFT JOIN users u ON u.user_id = m.user_id;
+
+-- Who has which access: one row per user x profile x permission.
+CREATE OR REPLACE VIEW v_user_access AS
+SELECT u.user_id, u.full_name, u.email, u.account_status,
+       pr.profile_code, pr.profile_name,
+       pe.permission_code, pe.permission_name, pe.module, pe.access_type
+  FROM users u
+  JOIN user_profiles up  ON up.user_id = u.user_id
+  JOIN profiles pr       ON pr.profile_id = up.profile_id
+  JOIN authorizations a  ON a.profile_id = pr.profile_id
+  JOIN permissions pe    ON pe.permission_id = a.permission_id;
+
+-- The authorization matrix: which profile may do what.
+CREATE OR REPLACE VIEW v_profile_permissions AS
+SELECT pr.profile_code, pr.profile_name, pr.is_staff,
+       pe.module, pe.permission_code, pe.permission_name, pe.access_type, a.granted_at
+  FROM profiles pr
+  JOIN authorizations a ON a.profile_id = pr.profile_id
+  JOIN permissions pe   ON pe.permission_id = a.permission_id;
+
+-- Customers with their details and how much they have bought.
+CREATE OR REPLACE VIEW v_customer_details AS
+SELECT u.user_id AS customer_id, u.full_name AS customer_name, u.email, cp.phone,
+       cp.address_line, cp.city, cp.state, cp.pincode, ou.name AS preferred_outlet,
+       u.account_status, u.created_at AS registered_on, u.last_login_at,
+       NVL(s.orders, 0) AS orders, NVL(s.paid_orders, 0) AS paid_orders,
+       NVL(s.total_spent, 0) AS total_spent, s.last_order_date
+  FROM users u
+  JOIN user_profiles up ON up.user_id = u.user_id
+  JOIN profiles pr      ON pr.profile_id = up.profile_id AND pr.profile_code = 'CUSTOMER'
+  LEFT JOIN customer_profiles cp ON cp.customer_id = u.user_id
+  LEFT JOIN outlets ou  ON ou.outlet_id = cp.preferred_outlet_id
+  LEFT JOIN (SELECT customer_id, COUNT(*) AS orders,
+                    SUM(CASE WHEN order_status = 'PAID' THEN 1 ELSE 0 END) AS paid_orders,
+                    SUM(CASE WHEN order_status = 'PAID' THEN total_amount ELSE 0 END) AS total_spent,
+                    MAX(created_at) AS last_order_date
+               FROM orders GROUP BY customer_id) s ON s.customer_id = u.user_id;
