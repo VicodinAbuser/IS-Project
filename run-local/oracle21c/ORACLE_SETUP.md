@@ -20,6 +20,7 @@ This folder is for **Oracle Database 21c**. You'll use host `localhost`, port `1
 1. Create the folder where Oracle will live, e.g. `C:\app\oracle\product\21c\dbhome_1`, and **unzip the file directly into it**. The unzipped folder *is* the Oracle installation, so don't move it afterwards. Avoid spaces in the path.
 2. In that folder, right-click **setup.exe** and choose **Run as administrator**.
 3. Choose **Create and configure a single instance database**, then **Desktop class**.
+   - On the **Specify Oracle Home User** screen, choose **Use Virtual Account** and click Next. Don't pick *Create New Windows User*: no new Windows user is needed. Oracle runs its services under a built-in virtual account, and you keep logging in to Windows as yourself.
 4. On the settings screen, write these down:
    - **Global database name**: e.g. `orcl`
    - **Password**: used for SYS and SYSTEM. Write it down.
