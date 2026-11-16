@@ -123,6 +123,23 @@ Then open http://localhost:4200.
 
 **Remember `COMMIT;`** after your own `INSERT`/`UPDATE` in SQL Developer, or the website won't see the change. The `inventory_pkg` procedures commit by themselves.
 
+## The large dataset (50,000 customers)
+
+The normal setup loads a small demo dataset (5 customers, ~260 orders). For a realistic demo,
+double-click **`6-load-big-dataset.bat`** after `2-setup-database.bat`. It loads the CSV files in
+`database\dataset\` (about 2–5 minutes):
+
+| Table | Rows |
+|---|---|
+| app_users | 50,003 (50,000 customers + 3 admins) |
+| orders / payments / deliveries | 89,260 each |
+| order_items | 172,140 |
+| stock_movements | 192,254 |
+| products / outlets / inventory | 89 / 10 / 890 |
+
+Every customer's password is `customer123` (e.g. `customer@inventory.com`); admins use `admin123`.
+To go back to the small demo data, run `5-reset-demo-data.bat`. Details: `database\dataset\README.md`.
+
 ## What each file does
 
 | File | When | What it does |
@@ -133,6 +150,7 @@ Then open http://localhost:4200.
 | `3-start-backend.bat` | (used by START-APP) | `uvicorn app.main:app --reload` in `backend` |
 | `4-start-website.bat` | (used by START-APP) | `npm start` in `frontend` |
 | `5-reset-demo-data.bat` | optional | Wipes the project data and reloads fresh demo data |
+| `6-load-big-dataset.bat` | optional | Replaces the data with the large dataset: 50,000 customers, ~89,000 orders (`database\dataset\*.csv`) |
 
 ## Problems?
 

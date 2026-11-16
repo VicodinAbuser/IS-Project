@@ -35,6 +35,10 @@ The Python API and SQL Developer both use **the same stored procedures**, so a s
 - Orders: filter by payment, delivery status or outlet; update delivery status, courier and tracking number; cancel
 - **Quarterly reports** with charts (by outlet, month, category, product), **downloadable as Excel or CSV**
 
+## Large dataset (50,000 customers)
+
+[`database/dataset/`](database/dataset/README.md) has one CSV file per table: 50,000 customers, 89,260 orders, 172,140 order items, 192,254 stock movements, covering Jan 2025 – Nov 2026. The data is simulated with the same rules as `INVENTORY_PKG`, so every table agrees with every other. It is checked by `tools/validate_dataset.py`, and loaded into Oracle by `backend/load_dataset.py` (or `6-load-big-dataset.bat` in `run-local`).
+
 ## How to run
 
 > **Easiest way (Windows):** use the **`run-local`** folder. It has one complete copy of the project for each Oracle version, with double-click scripts and instructions for that version only.
