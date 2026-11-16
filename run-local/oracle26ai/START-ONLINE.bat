@@ -29,9 +29,16 @@ echo Saved in ngrok-domain.txt - you won't be asked again.
 rem A private login-token secret, created once (the default one is public on GitHub).
 "backend\.venv\Scripts\python.exe" -c "import secrets,pathlib;p=pathlib.Path('backend/.env');t=p.read_text() if p.exists() else '';import sys;sys.exit(0) if 'JWT_SECRET=' in t else p.write_text(t+('\n' if t and not t.endswith('\n') else '')+'JWT_SECRET='+secrets.token_hex(32)+'\n')"
 
+rem The backend is shared with START-APP.bat: start it only if it isn't running yet.
+netstat -ano | findstr /r /c:":8000 .*LISTENING" >nul
+if not errorlevel 1 goto backendup
 start "Backend - FastAPI on port 8000" /D "%~dp0." cmd /k 3-start-backend.bat
 echo Starting the backend...
 timeout /t 8 /nobreak >nul
+goto tunnel
+:backendup
+echo Backend already running on port 8000 - using it.
+:tunnel
 echo.
 echo ==============================================================
 echo  Backend is public at:  https://%DOMAIN%

@@ -127,7 +127,17 @@ through a free **ngrok** tunnel with a fixed address. Full guide: `docs/DEPLOY_V
    You get a link like `https://is-project-xxxx.vercel.app`. That's the link your group uses, always.
 
 **Every time your group should be able to use it:** double-click **`START-ONLINE.bat`**
-(first time it asks for your ngrok domain and remembers it). Keep its two windows open; Ctrl+C to go offline.
+(first time it asks for your ngrok domain and remembers it). Keep its windows open; Ctrl+C in the ngrok window to go offline.
+
+**Local and online at the same time:** double-click `START-APP.bat` *and* `START-ONLINE.bat`, in any order.
+They share one backend and the same Oracle data, so an order placed on the Vercel link shows up at
+http://localhost:4200 and in SQL Developer, and the other way round.
+
+| You want | Double-click | Website address |
+|---|---|---|
+| Only on your laptop | `START-APP.bat` | http://localhost:4200 |
+| Only the public link | `START-ONLINE.bat` | your Vercel link |
+| Both | both files | both addresses, same data |
 
 Every `git push` to GitHub redeploys the website by itself. Changes to the backend or database only need
 the laptop's copy updated, then restart `START-ONLINE.bat`.
