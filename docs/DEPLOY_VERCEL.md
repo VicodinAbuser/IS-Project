@@ -4,7 +4,7 @@
 Anyone's browser ──► https://your-app.vercel.app          (Angular website, hosted by Vercel)
         │
         └── API calls ──► https://xyz.trycloudflare.com    (tunnel: a public address for your laptop)
-                              └──► your laptop: FastAPI :8000 ──► Oracle 26ai :1521
+                              └──► your laptop: FastAPI :8000 ──► Oracle :1521
 ```
 
 - **Vercel** only hosts the website files (HTML/JS/CSS). It never talks to Oracle.
@@ -27,6 +27,8 @@ Anyone's browser ──► https://your-app.vercel.app          (Angular website
 From now on, every `git push` to GitHub redeploys the site automatically.
 
 ## Part 2: Start everything on the laptop (each time you want the site to work)
+
+> **Shortcut (ngrok with a static domain):** in `run-local\oracle21c` or `run-local\oracle26ai`, double-click **`START-ONLINE.bat`**. It starts the backend and the ngrok tunnel together, so you can skip the manual steps below.
 
 You need three windows:
 

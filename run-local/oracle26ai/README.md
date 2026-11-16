@@ -114,6 +114,26 @@ Then open http://localhost:4200.
 
 ---
 
+## Share it online with your group (Vercel)
+
+The website goes on Vercel (free); the backend and Oracle stay on this laptop and are reached
+through a free **ngrok** tunnel with a fixed address. Full guide: `docs/DEPLOY_VERCEL.md` in the repository.
+
+**One time:**
+1. **ngrok:** sign up free at ngrok.com, follow *Setup & Installation* on the dashboard (install + `ngrok config add-authtoken ...`),
+   then under **Domains** claim your free static domain (e.g. `your-name.ngrok-free.app`).
+2. **Vercel:** sign in with GitHub → **Add New → Project** → import the repository → **Root Directory: `frontend`** →
+   **Environment Variables:** `API_URL` = `https://your-name.ngrok-free.app` → **Deploy**.
+   You get a link like `https://is-project-xxxx.vercel.app`. That's the link your group uses, always.
+
+**Every time your group should be able to use it:** double-click **`START-ONLINE.bat`**
+(first time it asks for your ngrok domain and remembers it). Keep its two windows open; Ctrl+C to go offline.
+
+Every `git push` to GitHub redeploys the website by itself. Changes to the backend or database only need
+the laptop's copy updated, then restart `START-ONLINE.bat`.
+
+---
+
 ## Presentation checklist
 1. *(Optional)* Double-click `5-reset-demo-data.bat` for fresh demo data.
 2. Double-click `START-APP.bat` and wait for the browser.
@@ -147,6 +167,7 @@ To go back to the small demo data, run `5-reset-demo-data.bat`. Details: `databa
 | `1-install.bat` | once | Creates `backend\.venv` and installs the Python packages; runs `npm install` in `frontend` |
 | `2-setup-database.bat` | once | Runs `database\00`–`03` against Oracle (asks for the SYSTEM password) |
 | `START-APP.bat` | every time | Starts the backend and the website, then opens the browser |
+| `START-ONLINE.bat` | to share online | Starts the backend and the ngrok tunnel, so the Vercel website reaches this laptop |
 | `3-start-backend.bat` | (used by START-APP) | `uvicorn app.main:app --reload` in `backend` |
 | `4-start-website.bat` | (used by START-APP) | `npm start` in `frontend` |
 | `5-reset-demo-data.bat` | optional | Wipes the project data and reloads fresh demo data |
