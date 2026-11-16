@@ -7,7 +7,7 @@ The project works with **either** of these. Both were tested.
 | Size / effort | Smaller, simpler installer | Full edition, larger, a few more installer screens |
 | Service name you'll use | `FREEPDB1` | `ORCLPDB` (the "pluggable database name" from the installer) |
 | Port | `1521` | `1521` |
-| SQL Developer | Separate download | Usually included in the Oracle home (`sqldeveloper` folder); otherwise download it |
+| SQL Developer | Separate download | Separate download (the Oracle home only has SQLcl, the command-line `sql.exe`) |
 
 > **You don't need to set any Windows environment variables.** The Oracle installer configures itself, and the project's Python code connects without any Oracle client software. The only setting, the service name, is asked for once by the setup script and saved in `backend\.env`.
 
@@ -49,8 +49,8 @@ The installer registers Oracle as Windows services that start automatically. It 
 ---
 
 ## Part B: SQL Developer
-- **21c:** look for `sqldeveloper\sqldeveloper.exe` inside your Oracle folder.
-- **26ai, or if it's missing:** download **Oracle SQL Developer** (Windows 64-bit, **with JDK included**), unzip it and run `sqldeveloper.exe`.
+- **21c:** the `sqldeveloper` folder inside your Oracle home only contains SQLcl (`sql.exe`, a command-line tool), not the SQL Developer window.
+- Download **Oracle SQL Developer** (Windows 64-bit, **with JDK included**) from oracle.com/database/sqldeveloper, extract it to `C:\` and run `C:\sqldeveloper\sqldeveloper.exe`. Nothing to install.
 
 ## Part C: Create the project user, tables and demo data
 

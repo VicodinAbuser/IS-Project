@@ -48,7 +48,7 @@ run-local/oracle21c/
 | Software | Notes |
 |---|---|
 | **Oracle Database 21c** (`WINDOWS.X64_213000_db_home.zip`) | Write down the **password** you choose during install (the SYSTEM password). Install steps: [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A. |
-| **Oracle SQL Developer** | Usually included with 21c: `sqldeveloper\sqldeveloper.exe` inside your Oracle folder. If it's missing, download the Windows 64-bit version **with JDK included**, unzip it and run `sqldeveloper.exe`. |
+| **Oracle SQL Developer** | Not included with 21c (its `sqldeveloper` folder only has the command-line SQLcl). Download the Windows 64-bit version **with JDK included**, unzip it and run `sqldeveloper.exe`. |
 | **Python 3.10+** from python.org | On the first installer screen, tick **"Add python.exe to PATH"**. |
 | **Node.js 18+ (LTS)** from nodejs.org | Click Next through the installer. |
 

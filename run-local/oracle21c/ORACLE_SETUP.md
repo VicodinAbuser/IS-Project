@@ -37,8 +37,8 @@ The installer registers Oracle as Windows services that start automatically. It 
 ---
 
 ## Part B: SQL Developer
-- **21c:** look for `sqldeveloper\sqldeveloper.exe` inside your Oracle folder.
-- **If it's missing:** download **Oracle SQL Developer** (Windows 64-bit, **with JDK included**), unzip it and run `sqldeveloper.exe`.
+- **21c:** the `sqldeveloper` folder inside your Oracle home only contains SQLcl (`sql.exe`, a command-line tool), not the SQL Developer window.
+- Download **Oracle SQL Developer** (Windows 64-bit, **with JDK included**) from oracle.com/database/sqldeveloper, extract it to `C:\` and run `C:\sqldeveloper\sqldeveloper.exe`. Nothing to install.
 
 ## Part C: Create the project user, tables and demo data
 

@@ -38,7 +38,7 @@ VARIANTS = {
         "ORACLE_FILE": " (`WINDOWS.X64_213000_db_home.zip`)",
         "SERVICE": "ORCLPDB",
         "PAD": "    ",
-        "SQLDEV": "Usually included with 21c: `sqldeveloper\\sqldeveloper.exe` inside your Oracle folder. If it's missing, d",
+        "SQLDEV": "Not included with 21c (its `sqldeveloper` folder only has the command-line SQLcl). D",
         "ORA01109_ROW": ORA01109_ROW,
         "OTHER": "Oracle 26ai Free",
         "OTHER_FOLDER": "oracle26ai",
@@ -50,7 +50,7 @@ VARIANTS = {
                         "| 26ai: `FREEPDB1`. 21c: `ORCLPDB` (your pluggable database name).":
                 "| `ORCLPDB` (your pluggable database name).",
             "Part A, Option 2, step 6": "Part A, step 6",
-            "- **26ai, or if it's missing:** download": "- **If it's missing:** download",
+            "- Download **Oracle SQL Developer**": "- Download **Oracle SQL Developer**",
         },
         # the default service is already ORCLPDB in this folder, so no .env step is needed
         "drop_lines": ["5. **21c only:** create"],
@@ -72,10 +72,9 @@ VARIANTS = {
                 "Service name [FREEPDB1]:     ← press Enter",
             "**Service name** `FREEPDB1` (26ai) or `ORCLPDB` (21c).": "**Service name** `FREEPDB1`.",
             "| 26ai: `FREEPDB1`. 21c: `ORCLPDB` (your pluggable database name).": "| Use `FREEPDB1`.",
-            "- **26ai, or if it's missing:** download": "- Download",
         },
         # lines that only apply to 21c
-        "drop_lines": ["- **21c:** look for", "5. **21c only:** create", "| `ORA-01109: database not open`"],
+        "drop_lines": ["- **21c:** the `sqldeveloper` folder", "5. **21c only:** create", "| `ORA-01109: database not open`"],
     },
 }
 
