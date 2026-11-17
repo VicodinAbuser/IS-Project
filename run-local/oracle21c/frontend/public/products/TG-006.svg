@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Soft Toy Teddy Bear">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0e6"/><stop offset="1" stop-color="#ffd2b3"/></linearGradient></defs>
+  <rect width="400" height="300" fill="url(#g)"/>
+  <circle cx="200" cy="128" r="82" fill="#ffffff" fill-opacity="0.65"/>
+  <text x="200" y="128" font-size="96" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif">🧸</text>
+  <text x="200" y="262" font-size="20" font-weight="600" fill="#1d2433" text-anchor="middle"
+        font-family="'Segoe UI',system-ui,-apple-system,Roboto,sans-serif">Soft Toy Teddy Bear</text>
+</svg>

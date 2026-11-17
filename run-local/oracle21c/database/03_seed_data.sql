@@ -81,7 +81,7 @@ DECLARE
                         p_price NUMBER, p_description VARCHAR2) IS
   BEGIN
     INSERT INTO products (sku, name, description, price, image_url, reorder_level, category_id, supplier_id)
-    VALUES (p_sku, p_name, p_description, p_price, 'https://picsum.photos/seed/' || p_sku || '/400/300', 10,
+    VALUES (p_sku, p_name, p_description, p_price, '/products/' || p_sku || '.svg', 10,
             (SELECT category_id FROM categories WHERE name = p_category),
             (SELECT supplier_id FROM suppliers  WHERE name = p_supplier));
   END;

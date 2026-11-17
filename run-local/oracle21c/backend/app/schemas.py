@@ -200,7 +200,8 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     description: str | None = Field(None, max_length=1000)
     price: float = Field(ge=0, le=10_000_000)
-    image_url: str | None = Field(None, max_length=500, pattern=r"^(https://\S+)?$")
+    # A picture on the website itself (/products/EL-001.svg) or an https:// address; nothing else (no javascript:).
+    image_url: str | None = Field(None, max_length=500, pattern=r"^(https://\S+|/[A-Za-z0-9_./-]+)?$")
     reorder_level: int = Field(default=10, ge=0, le=100_000)
     category_id: int | None = None
     supplier_id: int | None = None

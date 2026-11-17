@@ -20,7 +20,7 @@
       <div class="field"><label for="sup">Supplier</label>
         <select id="sup" formControlName="supplier_id"><option [ngValue]="null">—</option>
           @for (s of suppliers(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }</select></div>
-      <div class="field"><label for="img">Image URL</label><input id="img" formControlName="image_url" /></div>
+      <div class="field"><label for="img">Picture</label><input id="img" formControlName="image_url" placeholder="/products/SKU.svg or https://…" /></div>
       <div class="field check"><label><input type="checkbox" formControlName="is_active" /> Visible in shop</label></div>
     </div>
     <div class="field"><label for="desc">Description</label><textarea id="desc" rows="2" formControlName="description"></textarea></div>

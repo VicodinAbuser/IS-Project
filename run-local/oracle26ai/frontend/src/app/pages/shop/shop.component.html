@@ -19,7 +19,7 @@
 <div class="products mt">
   @for (p of products(); track p.id) {
     <article class="card product">
-      <img [src]="p.image_url" [alt]="p.name" loading="lazy" />
+      <img [src]="p.image_url || placeholder" [alt]="p.name" loading="lazy" (error)="noPicture($event)" />
       <div class="body">
         <span class="muted sku">{{ p.sku }} · {{ p.category?.name }}</span>
         <h2>{{ p.name }}</h2>

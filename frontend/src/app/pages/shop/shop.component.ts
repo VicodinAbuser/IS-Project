@@ -53,6 +53,13 @@ export class ShopComponent implements OnInit {
     this.load();
   }
 
+  /** Shown when a product has no picture, or its picture can't be loaded. */
+  readonly placeholder = '/products/placeholder.svg';
+  noPicture(event: Event) {
+    const img = event.target as HTMLImageElement;
+    if (!img.src.endsWith(this.placeholder)) img.src = this.placeholder;
+  }
+
   inCart(id: number) { return this.cart.items().find(i => i.product.id === id)?.quantity ?? 0; }
 
   add(p: Product) {
