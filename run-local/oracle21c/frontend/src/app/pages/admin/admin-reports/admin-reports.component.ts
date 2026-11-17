@@ -1,5 +1,5 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { ApiService, errorMessage } from '../../../core/api.service';
@@ -31,12 +31,22 @@ export class AdminReportsComponent implements OnInit, OnDestroy {
   categoryCanvas = viewChild<ElementRef<HTMLCanvasElement>>('categoryChart');
   private charts: Chart[] = [];
 
+  constructor() {
+    // Draw the charts once BOTH the report data and the <canvas> elements exist (the canvases are inside
+    // @if blocks, so they appear only after the data has rendered), and again whenever the report changes.
+    effect(() => {
+      const r = this.report();
+      const canvases = [this.outletCanvas(), this.monthCanvas(), this.categoryCanvas()];
+      if (r && canvases.every(Boolean)) untracked(() => this.draw(r));
+    });
+  }
+
   ngOnInit() { this.load(); }
   ngOnDestroy() { this.charts.forEach(c => c.destroy()); }
 
   load() {
     this.api.getQuarterly(this.year, this.quarter).subscribe({
-      next: r => { this.report.set(r); this.error.set(''); setTimeout(() => this.draw(r)); },
+      next: r => { this.report.set(r); this.error.set(''); },
       error: e => this.error.set(errorMessage(e)),
     });
   }
