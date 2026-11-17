@@ -25,8 +25,22 @@ if errorlevel 2 exit /b 0
 
 echo.
 echo === Downloading the latest version from GitHub ===
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/VicodinAbuser/IS-Project/archive/refs/heads/main.zip' -OutFile $env:ZIP; if (Test-Path $env:UNZIP) { Remove-Item -Recurse -Force $env:UNZIP }; Expand-Archive -Path $env:ZIP -DestinationPath $env:UNZIP"
+echo This is about 55 MB, so it can take a few minutes. A progress bar shows below.
+if exist "%ZIP%" del /q "%ZIP%"
+if exist "%UNZIP%" rmdir /s /q "%UNZIP%"
+where curl.exe >nul 2>nul
+if errorlevel 1 goto pwsh_download
+curl.exe -L --fail --retry 3 --connect-timeout 30 --progress-bar -o "%ZIP%" "https://github.com/VicodinAbuser/IS-Project/archive/refs/heads/main.zip"
 if errorlevel 1 goto fail
+goto unzip
+:pwsh_download
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol='Tls12'; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/VicodinAbuser/IS-Project/archive/refs/heads/main.zip' -OutFile $env:ZIP"
+if errorlevel 1 goto fail
+:unzip
+echo === Unpacking ===
+mkdir "%UNZIP%"
+tar -xf "%ZIP%" -C "%UNZIP%" 2>nul
+if not exist "%SRC%\backend\app\main.py" powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Force -Path $env:ZIP -DestinationPath $env:UNZIP"
 if not exist "%SRC%\backend\app\main.py" goto fail
 
 echo === Copying the new code ===
