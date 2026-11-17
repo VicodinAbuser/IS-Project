@@ -4,6 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
 import { AuthService } from '../../../core/auth.service';
 import { Choice, InventoryRow, Outlet, Product, StockMovement, UPDATED_WITHIN } from '../../../core/models';
+import { ToastService } from '../../../core/toast.service';
+
+const DEFAULT_STOCK = { outlet_id: null as number | null, low_only: false, search: '', sort: 'outlet_asc',
+                        updated_within_days: null as number | null };
+const DEFAULT_LOG = { movement_type: '', outlet_id: null as number | null, search: '', sort: 'newest',
+                      updated_within_days: null as number | null, limit: 100 };
 
 type Action = 'restock' | 'adjust' | 'transfer';
 
@@ -25,16 +31,15 @@ export class AdminInventoryComponent implements OnInit {
   within = UPDATED_WITHIN;
 
   // Stock list: filtering and sorting are done by the database (GET /api/inventory?sort=...)
-  stockFilter = { outlet_id: null as number | null, low_only: false, search: '', sort: 'outlet_asc',
-                  updated_within_days: null as number | null };
+  stockFilter = { ...DEFAULT_STOCK };
+  private toast = inject(ToastService);
   stockSorts: Choice[] = [
     { value: 'outlet_asc', label: 'Outlet, then product' }, { value: 'updated_desc', label: 'Latest updated' },
     { value: 'quantity_asc', label: 'Quantity: low to high' }, { value: 'quantity_desc', label: 'Quantity: high to low' },
     { value: 'product_asc', label: 'Product A–Z' }, { value: 'updated_asc', label: 'Least recently updated' },
   ];
   // Movement log
-  logFilter = { movement_type: '', outlet_id: null as number | null, search: '', sort: 'newest',
-                updated_within_days: null as number | null, limit: 100 };
+  logFilter = { ...DEFAULT_LOG };
   logSorts: Choice[] = [
     { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' },
     { value: 'change_desc', label: 'Biggest change' },
@@ -66,6 +71,11 @@ export class AdminInventoryComponent implements OnInit {
     this.api.getMovements(this.logFilter).subscribe({ next: m => this.movements.set(m), error: e => this.error.set(errorMessage(e)) });
   }
 
+  stockFiltersActive() { return JSON.stringify(this.stockFilter) !== JSON.stringify(DEFAULT_STOCK); }
+  resetStockFilters() { this.stockFilter = { ...DEFAULT_STOCK }; this.loadStock(); }
+  logFiltersActive() { return JSON.stringify(this.logFilter) !== JSON.stringify(DEFAULT_LOG); }
+  resetLogFilters() { this.logFilter = { ...DEFAULT_LOG }; this.loadLog(); }
+
   pick(r: InventoryRow) {
     this.f.product_id = r.product_id;
     this.f.outlet_id = r.outlet_id;
@@ -80,8 +90,14 @@ export class AdminInventoryComponent implements OnInit {
       this.action === 'adjust' ? this.api.adjust({ product_id, outlet_id, change: quantity, note: note || 'Manual adjustment' }) :
       this.api.transfer({ product_id, from_outlet_id: outlet_id, to_outlet_id: to_outlet_id!, quantity, note });
     req.subscribe({
-      next: () => { this.message.set('Inventory updated'); this.error.set(''); this.refresh(); setTimeout(() => this.message.set(''), 2500); },
-      error: e => { this.error.set(errorMessage(e)); this.message.set(''); },
+      next: () => {
+        const name = this.products().find(p => p.id === product_id)?.name ?? 'Product';
+        const what = this.action === 'restock' ? `restocked (+${quantity})` : this.action === 'adjust' ? `adjusted (${quantity > 0 ? '+' : ''}${quantity})` : `transferred (${quantity})`;
+        this.toast.success(`${name} ${what}`);
+        this.error.set('');
+        this.refresh();
+      },
+      error: e => { this.error.set(errorMessage(e)); this.toast.error(errorMessage(e)); },
     });
   }
 }

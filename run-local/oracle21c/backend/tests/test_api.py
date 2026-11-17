@@ -421,3 +421,29 @@ def test_abandoned_checkout_releases_stock(client):
     old = client.get(f"/api/orders/{stale}", headers=cust).json()
     assert old["status"] == "CANCELLED" and old["payment"]["status"] == "CANCELLED"
     assert _order(client, cust, outlet, product, 5).status_code == 201      # the stock was released
+
+
+def test_one_account_per_email_and_phone(client):
+    """A customer can register only once: the email (any capitals) and the phone number are unique,
+    checked in Python AND by Oracle's UNIQUE constraints; every user gets their own user_id."""
+    first = client.post("/api/auth/register", json={"name": "Asha", "email": "asha@test.com", "password": "secret12",
+                                                    "phone": "9811111111"})
+    assert first.status_code == 201
+    again = client.post("/api/auth/register", json={"name": "Asha Two", "email": "ASHA@Test.com", "password": "secret12"})
+    assert again.status_code == 409 and again.json()["detail"] == "This email is already registered"
+    phone = client.post("/api/auth/register", json={"name": "Other", "email": "other@test.com", "password": "secret12",
+                                                    "phone": "9811111111"})
+    assert phone.status_code == 409 and phone.json()["detail"] == "This phone number is already registered"
+    admin = auth(client, "admin@test.com", "admin123")
+    staff = client.post("/api/users", json={"name": "Xavier", "email": "asha@test.com", "password": "password1",
+                                            "profiles": ["WAREHOUSE_STAFF"]}, headers=admin)
+    assert staff.status_code == 409
+    # and the database itself refuses a duplicate even if the application check were skipped
+    conn = connect()
+    with conn.cursor() as cur, pytest.raises(oracledb.IntegrityError):
+        cur.execute("INSERT INTO users (full_name, email, password_hash) VALUES ('Dup', 'asha@test.com', 'x')")
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*), COUNT(DISTINCT user_id) FROM users WHERE email = 'asha@test.com'")
+        assert cur.fetchone() == (1, 1)
+    conn.close()

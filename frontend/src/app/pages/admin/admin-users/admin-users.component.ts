@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
 import { AuthService } from '../../../core/auth.service';
 import { Choice, PermissionInfo, ProfileCode, ProfileInfo, UPDATED_WITHIN, UserDetail, UserRow } from '../../../core/models';
+import { ToastService } from '../../../core/toast.service';
+
+const DEFAULT_FILTER = { search: '', profile: '', status: '', sort: 'updated_desc', updated_within_days: null as number | null, limit: 100 };
 
 /** Who is registered, which profiles they have, and what each profile may do (USERS, USER_PROFILES,
  *  PROFILES, AUTHORIZATIONS, PERMISSIONS tables). Changing access needs the USER_MANAGE permission. */
@@ -26,7 +29,8 @@ export class AdminUsersComponent implements OnInit {
   message = signal('');
   loading = signal(false);
 
-  filter = { search: '', profile: '', status: '', sort: 'updated_desc', updated_within_days: null as number | null, limit: 100 };
+  filter = { ...DEFAULT_FILTER };
+  private toast = inject(ToastService);
   sorts: Choice[] = [
     { value: 'updated_desc', label: 'Latest updated' }, { value: 'created_desc', label: 'Newest accounts' },
     { value: 'last_login_desc', label: 'Last login' }, { value: 'name_asc', label: 'Name A–Z' },
@@ -38,6 +42,14 @@ export class AdminUsersComponent implements OnInit {
   ngOnInit() {
     this.api.getProfiles().subscribe(p => this.profiles.set(p));
     this.api.getPermissions().subscribe(p => this.permissions.set(p));
+    this.load();
+  }
+
+  /** Is any filter different from the default? (enables the Reset button) */
+  filtersActive() { return JSON.stringify(this.filter) !== JSON.stringify(DEFAULT_FILTER); }
+
+  resetFilters() {
+    this.filter = { ...DEFAULT_FILTER };
     this.load();
   }
 
@@ -66,8 +78,7 @@ export class AdminUsersComponent implements OnInit {
 
   private flash(text: string) {
     this.error.set('');
-    this.message.set(text);
-    setTimeout(() => this.message.set(''), 2500);
+    this.toast.success(text);
   }
 
   saveProfiles() {

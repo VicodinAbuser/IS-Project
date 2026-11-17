@@ -3,6 +3,9 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService, errorMessage } from '../../../core/api.service';
 import { Category, Choice, Product, Supplier, UPDATED_WITHIN } from '../../../core/models';
+import { ToastService } from '../../../core/toast.service';
+
+const DEFAULT_FILTER = { search: '', sort: 'updated_desc', updated_within_days: null as number | null, include_inactive: true };
 
 @Component({
   selector: 'app-admin-products',
@@ -19,7 +22,8 @@ export class AdminProductsComponent implements OnInit {
   showForm = signal(false);
   error = signal('');
   message = signal('');
-  filter = { search: '', sort: 'updated_desc', updated_within_days: null as number | null, include_inactive: true };
+  filter = { ...DEFAULT_FILTER };
+  private toast = inject(ToastService);
   sorts: Choice[] = [
     { value: 'updated_desc', label: 'Latest updated' }, { value: 'newest', label: 'Newest products' },
     { value: 'name_asc', label: 'Name A–Z' }, { value: 'price_asc', label: 'Price: low to high' },
@@ -47,6 +51,15 @@ export class AdminProductsComponent implements OnInit {
 
   load() { this.api.getProducts(this.filter).subscribe(p => this.products.set(p)); }
 
+  /** Is any filter different from the default? (enables the Reset button) */
+  filtersActive() { return JSON.stringify(this.filter) !== JSON.stringify(DEFAULT_FILTER); }
+
+  resetFilters() {
+    this.filter = { ...DEFAULT_FILTER };
+    this.load();
+  }
+
+
   newProduct() {
     this.editingId.set(null);
     this.form.reset({ price: 0, reorder_level: 10, is_active: true, category_id: null, supplier_id: null });
@@ -67,13 +80,13 @@ export class AdminProductsComponent implements OnInit {
     const id = this.editingId();
     const req = id ? this.api.updateProduct(id, body) : this.api.createProduct(body);
     req.subscribe({
-      next: p => { this.message.set(`Saved ${p.name}`); this.showForm.set(false); this.error.set(''); this.load(); },
+      next: p => { this.toast.success(`Saved ${p.name}`); this.showForm.set(false); this.error.set(''); this.load(); },
       error: e => this.error.set(errorMessage(e)),
     });
   }
 
   deactivate(p: Product) {
     if (!confirm(`Hide "${p.name}" from the shop?`)) return;
-    this.api.deactivateProduct(p.id).subscribe(() => this.load());
+    this.api.deactivateProduct(p.id).subscribe(() => { this.toast.success(`${p.name} is now hidden from the shop`); this.load(); });
   }
 }

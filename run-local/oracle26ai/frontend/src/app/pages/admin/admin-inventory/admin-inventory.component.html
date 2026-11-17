@@ -47,6 +47,7 @@
       <div><label for="su">Updated</label>
         <select id="su" [(ngModel)]="stockFilter.updated_within_days" (ngModelChange)="loadStock()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
       <label class="chk"><input type="checkbox" [(ngModel)]="stockFilter.low_only" (ngModelChange)="loadStock()" /> Low stock only</label>
+      <button class="btn secondary" type="button" (click)="resetStockFilters()" [disabled]="!stockFiltersActive()">↺ Reset filters</button>
       <span class="count">{{ rows().length }} rows</span>
     </div>
     <div class="card table-wrap mt">
@@ -99,6 +100,7 @@
         <select id="ls" [(ngModel)]="logFilter.sort" (ngModelChange)="loadLog()">@for (s of logSorts; track s.value) { <option [value]="s.value">{{ s.label }}</option> }</select></div>
       <div><label for="lu">When</label>
         <select id="lu" [(ngModel)]="logFilter.updated_within_days" (ngModelChange)="loadLog()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+      <button class="btn secondary" type="button" (click)="resetLogFilters()" [disabled]="!logFiltersActive()">↺ Reset filters</button>
       <span class="count">{{ movements().length }} shown</span>
     </div>
     <div class="card table-wrap mt">

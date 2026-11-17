@@ -60,6 +60,15 @@ export class ShopComponent implements OnInit {
     if (!img.src.endsWith(this.placeholder)) img.src = this.placeholder;
   }
 
+  filtersActive() { return !!this.search || this.categoryId !== null || this.sort !== 'name_asc'; }
+
+  resetFilters() {
+    this.search = '';
+    this.categoryId = null;
+    this.sort = 'name_asc';
+    this.load();
+  }
+
   inCart(id: number) { return this.cart.items().find(i => i.product.id === id)?.quantity ?? 0; }
 
   add(p: Product) {

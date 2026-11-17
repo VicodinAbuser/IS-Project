@@ -9,6 +9,7 @@
       <option value="CANCELLED">Cancelled</option><option value="RETURNED">Returned</option></select></div>
   <div><label for="up">Updated</label>
     <select id="up" [(ngModel)]="filter.updated_within_days" (ngModelChange)="load()">@for (w of within; track w.label) { <option [ngValue]="w.value">{{ w.label }}</option> }</select></div>
+  <button class="btn secondary" type="button" (click)="resetFilters()" [disabled]="!filtersActive()">↺ Reset filters</button>
   <span class="count">{{ orders().length }} orders</span>
 </div>
 <div class="grid">
