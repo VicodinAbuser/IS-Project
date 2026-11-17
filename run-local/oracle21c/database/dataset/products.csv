@@ -1,45 +1,45 @@
 PRODUCT_ID,SKU,NAME,DESCRIPTION,PRICE,IMAGE_URL,REORDER_LEVEL,IS_ACTIVE,CATEGORY_ID,SUPPLIER_ID,CREATED_AT,UPDATED_AT
-1,EL-001,Wireless Mouse,2.4GHz ergonomic mouse,699.00,/products/EL-001.svg,10,1,1,1,2024-12-06 00:00:00,2024-12-08 00:00:00
-2,EL-002,Bluetooth Headphones,"Over-ear, 30h battery",2499.00,/products/EL-002.svg,10,1,1,1,2024-11-25 00:00:00,2024-11-25 00:00:00
-3,EL-003,USB-C Charger 65W,Fast charging GaN adapter,1599.00,/products/EL-003.svg,10,1,1,1,2024-11-18 00:00:00,2024-11-22 00:00:00
-4,EL-004,Mechanical Keyboard,Hot-swappable switches,3999.00,/products/EL-004.svg,10,1,1,1,2024-11-19 00:00:00,2024-11-23 00:00:00
-5,EL-005,Power Bank 20000mAh,Dual USB output,1899.00,/products/EL-005.svg,10,1,1,1,2024-11-22 00:00:00,2024-11-26 00:00:00
-6,ST-001,A4 Notebook (Pack of 5),"200 pages each, ruled",349.00,/products/ST-001.svg,10,1,2,2,2024-12-07 00:00:00,2024-12-11 00:00:00
-7,ST-002,Gel Pens (Pack of 10),Smooth 0.5mm tip,199.00,/products/ST-002.svg,10,1,2,2,2024-12-02 00:00:00,2024-12-02 00:00:00
-8,ST-003,Desk Organizer,"Bamboo, 5 compartments",549.00,/products/ST-003.svg,10,1,2,2,2024-11-24 00:00:00,2024-11-26 00:00:00
-9,HK-001,Steel Water Bottle 1L,"Insulated, keeps cold 24h",599.00,/products/HK-001.svg,10,1,3,3,2024-12-01 00:00:00,2024-12-03 00:00:00
-10,HK-002,Non-stick Frying Pan,"28cm, induction ready",1299.00,/products/HK-002.svg,10,1,3,3,2024-11-27 00:00:00,2024-11-30 00:00:00
-11,HK-003,Coffee Mug Set,Set of 4 ceramic mugs,799.00,/products/HK-003.svg,10,1,3,3,2024-11-25 00:00:00,2024-11-25 00:00:00
+1,EL-001,Wireless Mouse,2.4GHz ergonomic mouse,699.00,/products/EL-001.jpg,10,1,1,1,2024-12-06 00:00:00,2024-12-08 00:00:00
+2,EL-002,Bluetooth Headphones,"Over-ear, 30h battery",2499.00,/products/EL-002.jpg,10,1,1,1,2024-11-25 00:00:00,2024-11-25 00:00:00
+3,EL-003,USB-C Charger 65W,Fast charging GaN adapter,1599.00,/products/EL-003.jpg,10,1,1,1,2024-11-18 00:00:00,2024-11-22 00:00:00
+4,EL-004,Mechanical Keyboard,Hot-swappable switches,3999.00,/products/EL-004.jpg,10,1,1,1,2024-11-19 00:00:00,2024-11-23 00:00:00
+5,EL-005,Power Bank 20000mAh,Dual USB output,1899.00,/products/EL-005.jpg,10,1,1,1,2024-11-22 00:00:00,2024-11-26 00:00:00
+6,ST-001,A4 Notebook (Pack of 5),"200 pages each, ruled",349.00,/products/ST-001.jpg,10,1,2,2,2024-12-07 00:00:00,2024-12-11 00:00:00
+7,ST-002,Gel Pens (Pack of 10),Smooth 0.5mm tip,199.00,/products/ST-002.jpg,10,1,2,2,2024-12-02 00:00:00,2024-12-02 00:00:00
+8,ST-003,Desk Organizer,"Bamboo, 5 compartments",549.00,/products/ST-003.jpg,10,1,2,2,2024-11-24 00:00:00,2024-11-26 00:00:00
+9,HK-001,Steel Water Bottle 1L,"Insulated, keeps cold 24h",599.00,/products/HK-001.jpg,10,1,3,3,2024-12-01 00:00:00,2024-12-03 00:00:00
+10,HK-002,Non-stick Frying Pan,"28cm, induction ready",1299.00,/products/HK-002.jpg,10,1,3,3,2024-11-27 00:00:00,2024-11-30 00:00:00
+11,HK-003,Coffee Mug Set,Set of 4 ceramic mugs,799.00,/products/HK-003.jpg,10,1,3,3,2024-11-25 00:00:00,2024-11-25 00:00:00
 12,AP-001,Cotton T-Shirt,"Unisex, 100% cotton",499.00,/products/AP-001.jpg,10,1,4,,2024-12-05 00:00:00,2024-12-09 00:00:00
 13,AP-002,Hoodie,Fleece-lined pullover,1499.00,/products/AP-002.jpg,10,1,4,,2024-11-29 00:00:00,2024-12-02 00:00:00
-14,EL-006,Smart Watch,"AMOLED display, heart-rate monitor",4999.00,/products/EL-006.svg,10,1,1,4,2026-01-31 22:53:37,2026-02-02 22:53:37
-15,EL-007,Wireless Earbuds,"Bluetooth 5.3, 24h with case",1999.00,/products/EL-007.svg,10,1,1,4,2025-08-02 05:22:55,2025-08-05 05:22:55
-16,EL-008,Portable Bluetooth Speaker,"Waterproof, 12h battery",2299.00,/products/EL-008.svg,10,1,1,4,2025-11-11 12:59:24,2025-11-11 12:59:24
-17,EL-009,Full HD Webcam,1080p with dual microphones,2799.00,/products/EL-009.svg,10,1,1,1,2026-04-18 09:05:18,2026-04-21 09:05:18
-18,EL-010,32GB USB Flash Drive,"USB 3.2, metal body",399.00,/products/EL-010.svg,10,1,1,1,2024-11-24 00:00:00,2024-11-28 00:00:00
-19,EL-011,1TB External SSD,Up to 1050 MB/s,7499.00,/products/EL-011.svg,10,1,1,4,2024-11-25 00:00:00,2024-11-25 00:00:00
-20,EL-012,LED Desk Lamp,"3 colour modes, USB charging port",1199.00,/products/EL-012.svg,10,1,1,1,2026-03-23 08:06:50,2026-03-27 08:06:50
-21,EL-013,HDMI Cable 2m,"4K 60Hz, braided",349.00,/products/EL-013.svg,10,0,1,1,2024-11-21 00:00:00,2026-06-12 13:22:31
-22,EL-014,Wi-Fi Router AX1800,Dual-band Wi-Fi 6,3499.00,/products/EL-014.svg,10,1,1,4,2024-12-05 00:00:00,2024-12-08 00:00:00
-23,EL-015,Laptop Stand,"Aluminium, adjustable height",1299.00,/products/EL-015.svg,10,1,1,4,2026-06-04 04:55:42,2026-06-08 04:55:42
-24,ST-004,Sticky Notes (Pack of 6),"3x3 inch, assorted colours",149.00,/products/ST-004.svg,10,1,2,11,2024-11-28 00:00:00,2024-12-02 00:00:00
-25,ST-005,Highlighter Set (6 colours),"Chisel tip, quick-dry",179.00,/products/ST-005.svg,10,1,2,11,2024-11-23 00:00:00,2024-11-26 00:00:00
-26,ST-006,Spiral Diary 2026,"Dated, one day per page",299.00,/products/ST-006.svg,10,1,2,2,2024-12-03 00:00:00,2024-12-03 00:00:00
-27,ST-007,Scientific Calculator,"417 functions, solar + battery",899.00,/products/ST-007.svg,10,1,2,11,2025-11-30 14:17:48,2025-12-03 14:17:48
-28,ST-008,Stapler with 1000 Pins,"Full-strip, 20 sheet capacity",229.00,/products/ST-008.svg,10,1,2,11,2025-08-02 08:48:26,2025-08-03 08:48:26
-29,ST-009,Drawing Pencil Set,"12 grades, 6B to 4H",259.00,/products/ST-009.svg,10,1,2,2,2024-11-22 00:00:00,2024-11-25 00:00:00
-30,ST-010,Document File Folders (Pack of 10),"A4 size, button closure",249.00,/products/ST-010.svg,10,1,2,11,2026-05-10 05:48:37,2026-05-12 05:48:37
-31,ST-011,Whiteboard 2x3 ft,"Magnetic, with marker and duster",1099.00,/products/ST-011.svg,10,1,2,11,2025-03-17 15:54:09,2025-03-21 15:54:09
-32,ST-012,Fountain Pen,"Medium nib, refillable converter",649.00,/products/ST-012.svg,10,1,2,2,2025-05-01 06:29:01,2025-05-04 06:29:01
-33,HK-004,Pressure Cooker 5L,"Stainless steel, induction base",2199.00,/products/HK-004.svg,10,1,3,10,2024-12-07 00:00:00,2024-12-09 00:00:00
-34,HK-005,Glass Storage Containers (Set of 3),"Airtight, microwave safe",899.00,/products/HK-005.svg,10,1,3,10,2024-12-02 00:00:00,2024-12-05 00:00:00
-35,HK-006,Electric Kettle 1.5L,"Auto shut-off, 1500W",1149.00,/products/HK-006.svg,10,1,3,3,2025-03-15 11:12:15,2025-03-18 11:12:15
-36,HK-007,Chef Knife 8 inch,High-carbon stainless steel,999.00,/products/HK-007.svg,10,1,3,10,2025-03-12 18:41:25,2025-03-13 18:41:25
-37,HK-008,Cotton Bedsheet Double,With 2 pillow covers,1399.00,/products/HK-008.svg,10,1,3,3,2026-02-19 04:55:40,2026-02-21 04:55:40
-38,HK-009,Mixer Grinder 750W,"3 jars, 5-year motor warranty",3299.00,/products/HK-009.svg,10,1,3,10,2025-04-17 16:50:41,2025-04-19 16:50:41
-39,HK-010,Lunch Box (3 compartments),"Leak-proof, insulated bag",549.00,/products/HK-010.svg,10,1,3,3,2026-05-18 23:52:14,2026-05-21 23:52:14
-40,HK-011,Bath Towel Set,"2 towels, 500 GSM cotton",899.00,/products/HK-011.svg,10,1,3,3,2025-11-04 02:07:57,2025-11-07 02:07:57
-41,HK-012,Dinner Plate Set,"Set of 6, melamine",1599.00,/products/HK-012.svg,10,1,3,10,2026-04-22 03:16:59,2026-04-26 03:16:59
+14,EL-006,Smart Watch,"AMOLED display, heart-rate monitor",4999.00,/products/EL-006.jpg,10,1,1,4,2026-01-31 22:53:37,2026-02-02 22:53:37
+15,EL-007,Wireless Earbuds,"Bluetooth 5.3, 24h with case",1999.00,/products/EL-007.jpg,10,1,1,4,2025-08-02 05:22:55,2025-08-05 05:22:55
+16,EL-008,Portable Bluetooth Speaker,"Waterproof, 12h battery",2299.00,/products/EL-008.jpg,10,1,1,4,2025-11-11 12:59:24,2025-11-11 12:59:24
+17,EL-009,Full HD Webcam,1080p with dual microphones,2799.00,/products/EL-009.jpg,10,1,1,1,2026-04-18 09:05:18,2026-04-21 09:05:18
+18,EL-010,32GB USB Flash Drive,"USB 3.2, metal body",399.00,/products/EL-010.jpg,10,1,1,1,2024-11-24 00:00:00,2024-11-28 00:00:00
+19,EL-011,1TB External SSD,Up to 1050 MB/s,7499.00,/products/EL-011.jpg,10,1,1,4,2024-11-25 00:00:00,2024-11-25 00:00:00
+20,EL-012,LED Desk Lamp,"3 colour modes, USB charging port",1199.00,/products/EL-012.jpg,10,1,1,1,2026-03-23 08:06:50,2026-03-27 08:06:50
+21,EL-013,HDMI Cable 2m,"4K 60Hz, braided",349.00,/products/EL-013.jpg,10,0,1,1,2024-11-21 00:00:00,2026-06-12 13:22:31
+22,EL-014,Wi-Fi Router AX1800,Dual-band Wi-Fi 6,3499.00,/products/EL-014.jpg,10,1,1,4,2024-12-05 00:00:00,2024-12-08 00:00:00
+23,EL-015,Laptop Stand,"Aluminium, adjustable height",1299.00,/products/EL-015.jpg,10,1,1,4,2026-06-04 04:55:42,2026-06-08 04:55:42
+24,ST-004,Sticky Notes (Pack of 6),"3x3 inch, assorted colours",149.00,/products/ST-004.jpg,10,1,2,11,2024-11-28 00:00:00,2024-12-02 00:00:00
+25,ST-005,Highlighter Set (6 colours),"Chisel tip, quick-dry",179.00,/products/ST-005.jpg,10,1,2,11,2024-11-23 00:00:00,2024-11-26 00:00:00
+26,ST-006,Spiral Diary 2026,"Dated, one day per page",299.00,/products/ST-006.jpg,10,1,2,2,2024-12-03 00:00:00,2024-12-03 00:00:00
+27,ST-007,Scientific Calculator,"417 functions, solar + battery",899.00,/products/ST-007.jpg,10,1,2,11,2025-11-30 14:17:48,2025-12-03 14:17:48
+28,ST-008,Stapler with 1000 Pins,"Full-strip, 20 sheet capacity",229.00,/products/ST-008.jpg,10,1,2,11,2025-08-02 08:48:26,2025-08-03 08:48:26
+29,ST-009,Drawing Pencil Set,"12 grades, 6B to 4H",259.00,/products/ST-009.jpg,10,1,2,2,2024-11-22 00:00:00,2024-11-25 00:00:00
+30,ST-010,Document File Folders (Pack of 10),"A4 size, button closure",249.00,/products/ST-010.jpg,10,1,2,11,2026-05-10 05:48:37,2026-05-12 05:48:37
+31,ST-011,Whiteboard 2x3 ft,"Magnetic, with marker and duster",1099.00,/products/ST-011.jpg,10,1,2,11,2025-03-17 15:54:09,2025-03-21 15:54:09
+32,ST-012,Fountain Pen,"Medium nib, refillable converter",649.00,/products/ST-012.jpg,10,1,2,2,2025-05-01 06:29:01,2025-05-04 06:29:01
+33,HK-004,Pressure Cooker 5L,"Stainless steel, induction base",2199.00,/products/HK-004.jpg,10,1,3,10,2024-12-07 00:00:00,2024-12-09 00:00:00
+34,HK-005,Glass Storage Containers (Set of 3),"Airtight, microwave safe",899.00,/products/HK-005.jpg,10,1,3,10,2024-12-02 00:00:00,2024-12-05 00:00:00
+35,HK-006,Electric Kettle 1.5L,"Auto shut-off, 1500W",1149.00,/products/HK-006.jpg,10,1,3,3,2025-03-15 11:12:15,2025-03-18 11:12:15
+36,HK-007,Chef Knife 8 inch,High-carbon stainless steel,999.00,/products/HK-007.jpg,10,1,3,10,2025-03-12 18:41:25,2025-03-13 18:41:25
+37,HK-008,Cotton Bedsheet Double,With 2 pillow covers,1399.00,/products/HK-008.jpg,10,1,3,3,2026-02-19 04:55:40,2026-02-21 04:55:40
+38,HK-009,Mixer Grinder 750W,"3 jars, 5-year motor warranty",3299.00,/products/HK-009.jpg,10,1,3,10,2025-04-17 16:50:41,2025-04-19 16:50:41
+39,HK-010,Lunch Box (3 compartments),"Leak-proof, insulated bag",549.00,/products/HK-010.jpg,10,1,3,3,2026-05-18 23:52:14,2026-05-21 23:52:14
+40,HK-011,Bath Towel Set,"2 towels, 500 GSM cotton",899.00,/products/HK-011.jpg,10,1,3,3,2025-11-04 02:07:57,2025-11-07 02:07:57
+41,HK-012,Dinner Plate Set,"Set of 6, melamine",1599.00,/products/HK-012.jpg,10,1,3,10,2026-04-22 03:16:59,2026-04-26 03:16:59
 42,AP-003,Denim Jeans,"Slim fit, stretchable",1799.00,/products/AP-003.jpg,10,1,4,12,2024-12-05 00:00:00,2024-12-06 00:00:00
 43,AP-004,Formal Shirt,"Cotton blend, wrinkle-free",1199.00,/products/AP-004.jpg,10,1,4,5,2025-07-03 14:12:48,2025-07-06 14:12:48
 44,AP-005,Kurta,"Printed cotton, regular fit",999.00,/products/AP-005.jpg,10,1,4,5,2024-12-02 00:00:00,2024-12-05 00:00:00
