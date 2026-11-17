@@ -2,6 +2,32 @@
 
 An Information Systems course project built as a **3-tier web application**.
 
+## The business: StockSmart Retail
+An **omnichannel general-merchandise retail chain** in India: one company selling everyday products from many
+categories through its **10 outlets** and its **online shop** (customers order online from their nearest outlet).
+
+| | |
+|---|---|
+| Products | 89 products (SKUs) in 8 categories: Electronics, Stationery, Home & Kitchen, Apparel, Sports & Fitness, Beauty & Personal Care, Books, Toys & Games |
+| Outlets | Mumbai, Pune, Bengaluru, Delhi (warehouse), Chennai, Hyderabad, Kolkata, Ahmedabad, Jaipur, Kochi |
+| Suppliers | 12 wholesalers / brands |
+| Customers | 50,000 registered online customers in 18 cities (large data set) |
+| Sales | about 89,000 orders, Jan 2025 – Nov 2026, with a festive peak in Oct–Nov |
+| Staff | Administrator, store manager, warehouse staff |
+
+Why it needs this system: many products across many categories, stock spread over 10 locations, different suppliers,
+and customers ordering online, so stock must be correct per outlet at every moment.
+
+## What type of system it is
+| Classification | This project |
+|---|---|
+| How stock is tracked | **Perpetual** inventory: every sale, cancel, return, restock, adjustment and transfer updates stock immediately (not counted once a month) |
+| Locations | **Multi-location**: stock per outlet, totals across outlets, transfers between them |
+| Scope | **Inventory + order management** (catalogue, stock, orders, payments, deliveries); not a full ERP (no accounting / HR) |
+| Information-system level | **TPS** (transaction processing: orders, payments, stock movements, each one all-or-nothing) **+ MIS** (dashboard, low-stock alerts, quarterly reports with charts and Excel/CSV download). **DSS** features (forecasting, reorder suggestions, what-if) are possible future work |
+| Users | **B2C** customers + internal staff, with role-based access |
+| Architecture | Web-based, client–server, **3-tier**, one central relational database |
+
 | Tier | Technology | What it does | Folder |
 |---|---|---|---|
 | Presentation (UI) | Angular 19 (TypeScript, SCSS, Chart.js) | Screens and forms; calls the REST API | `frontend/` |
@@ -24,7 +50,7 @@ flowchart LR
 
 **Customer**
 - Sign up with personal details (phone, address, PIN code, nearest outlet), log in by typing email and password
-- Browse an outlet's products with live stock; search, filter by category, **sort** by name, price or newest
+- Browse an outlet's products **with photos** and live stock; search, filter by category, **sort** by name, price or newest
 - Cart and checkout: stock is reserved straight away, so it can't be oversold
 - Payment gateway (card, UPI or net banking) with decline handling and retry
 - My orders: **sort by latest update**, filter by status and by "updated today / last 7 / 30 days"; cancel before shipping
@@ -35,7 +61,9 @@ flowchart LR
 - Inventory: stock **per outlet** and **collective**; restock, adjust, transfer; movement log with *who* changed what
 - Products: create, edit, hide; Orders: delivery status, courier, tracking, returns, cancel
 - Every list can be **sorted** (latest updated, newest, amount, quantity, name ...) and filtered by **"updated within"**
-- **Quarterly reports** with charts, downloadable as **Excel or CSV**
+- **Quarterly reports** (choose year and quarter): totals (orders, units, revenue), charts of revenue **by outlet**,
+  **by month** and **by category**, top products and current stock per outlet; downloadable as **Excel** (one sheet per
+  section) **or CSV** by anyone with the `REPORT_DOWNLOAD` permission (admin, store manager)
 - **Users & access** (admins): all registered users with their profiles, create staff accounts, change profiles, disable or unlock accounts, and the full **authorization matrix**
 
 **Security**
@@ -48,6 +76,16 @@ flowchart LR
 ## Large dataset (50,000 customers)
 
 [`database/dataset/`](database/dataset/README.md) has one CSV file per table (16 files): 50,000 customers with their profiles, 89,260 orders, 172,140 order items, 192,254 stock movements, covering Jan 2025 – Nov 2026. The data is simulated with the same rules as the application, so every table agrees with every other. It is checked by `tools/validate_dataset.py`, and loaded into Oracle by `backend/load_dataset.py` (or `6-load-big-dataset.bat` in `run-local`).
+
+## Product photos
+Every product has a real photo, stored in the project (no outside image website):
+- `frontend/public/products/<SKU>.jpg`: one photo per product (e.g. `EL-011.jpg`), all fitted to the same 800 × 600 size
+  by `tools/add_product_photos.py` (`python tools/add_product_photos.py <folder of photos named by SKU>`).
+- `frontend/public/products/<SKU>.svg`: icon pictures made by `tools/generate_product_images.py`, used for any product
+  without a photo; `placeholder.svg` ("No picture yet") is shown if a product has no picture at all.
+- The database points to them: `PRODUCTS.IMAGE_URL = '/products/<SKU>.jpg'`. On a database loaded earlier, run
+  `UPDATE products SET image_url = '/products/' || sku || '.jpg'; COMMIT;`
+- Admins can give a new product a picture in **Products → Picture** (a `/products/...` path or an `https://` address).
 
 ## How to run
 
@@ -105,6 +143,11 @@ Open http://localhost:4200. The Angular dev server forwards `/api` to the backen
 | Store manager | manager@inventory.com | admin123 | STORE_MANAGER |
 | Warehouse staff | warehouse@inventory.com | admin123 | WAREHOUSE_STAFF |
 | Customer | customer@inventory.com | customer123 | CUSTOMER |
+| More customers | priya@example.com, rahul@example.com, aisha@example.com | customer123 | CUSTOMER |
+
+With the large data set loaded, all 50,000 customers use `customer123` (find emails in **Users & access** or
+`SELECT email FROM v_customer_details`). 5 wrong passwords lock an account for 15 minutes (admins can unlock it).
+These are demo passwords: change the staff passwords before sharing the public link widely.
 
 Payment test rule: a card ending in `0000`, or a UPI ID starting with `fail`, is **declined**. Anything else succeeds.
 
@@ -200,6 +243,17 @@ Design decisions worth explaining:
 
 `backend/app/database.py` → `transaction()` runs each action: **COMMIT** if it all worked, **ROLLBACK** if any rule or Oracle constraint failed. The procedures themselves never commit.
 
+All stored procedures and functions in package **`INVENTORY_PKG`** (SQL Developer: *Packages → INVENTORY_PKG*; they are
+inside the package, so the separate *Procedures* folder is empty):
+
+| Group | Procedures / functions |
+|---|---|
+| Stock | `LOCK_STOCK`, `APPLY_STOCK_CHANGE`, `RESTORE_ORDER_STOCK`, `STOCK_AT` (function), `TOTAL_STOCK` (function) |
+| Orders | `CREATE_ORDER`, `ADD_ORDER_ITEM`, `OPEN_PAYMENT_AND_DELIVERY`, `LOCK_ORDER`, `SET_ORDER_STATUS`, `SET_PAYMENT`, `SET_DELIVERY` |
+| Users & access | `CREATE_USER`, `SAVE_CUSTOMER_PROFILE`, `ASSIGN_PROFILE`, `REVOKE_PROFILE`, `SET_ACCOUNT_STATUS`, `UPDATE_USER_NAME`, `TOUCH_USER`, `RECORD_LOGIN_SUCCESS`, `RECORD_LOGIN_FAILURE`, `UNLOCK_USER` |
+| Catalogue | `SAVE_PRODUCT`, `SET_PRODUCT_ACTIVE`, `CREATE_OUTLET` |
+| For the audit trigger | `CTX_MOVEMENT_TYPE`, `CTX_USER_ID`, `CTX_ORDER_ID`, `CTX_NOTE`, `CTX_WHEN` (functions), `SET_BACKDATE` |
+
 **Triggers:** `TRG_INVENTORY_AUDIT` logs every stock change to `STOCK_MOVEMENTS` (a plain `UPDATE` in SQL Developer is logged as `MANUAL`); eight `TRG_*_UPDATED` / `TRG_*_TOUCH_ORDER` triggers maintain the `UPDATED_AT` columns.
 
 ## REST API
@@ -209,14 +263,19 @@ The UI calls these endpoints (all under `/api`, see `frontend/src/app/core/api.s
 | Method | Endpoint | Permission | Purpose |
 |---|---|---|---|
 | POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | public | Sets / clears the HttpOnly session cookie |
+| POST | `/api/auth/token` | public | Bearer token for Swagger's **Authorize** button and scripts |
 | GET / PUT | `/api/auth/me` | logged in | Who am I (profiles, permissions); edit my details |
-| GET | `/api/products?search=&category_id=&outlet_id=&sort=&updated_within_days=` | CATALOG_READ | Catalogue with stock |
+| GET | `/api/health` | public | Is the API up and can it reach Oracle? (shown on the login page) |
+| GET | `/api/outlets`, `/api/categories` | public | Lookups (sign-up page, shop filters) |
+| GET | `/api/suppliers` | CATALOG_WRITE | Supplier list for the product form |
+| GET | `/api/products?search=&category_id=&outlet_id=&sort=&updated_within_days=`, `/api/products/{id}` | CATALOG_READ | Catalogue with stock |
 | POST / PUT / DELETE | `/api/products[/id]`, POST `/api/outlets` | CATALOG_WRITE | Manage the catalogue |
 | GET | `/api/inventory?outlet_id=&low_only=&sort=&updated_within_days=`, `/summary`, `/low-stock`, `/movements` | STOCK_READ | Stock and audit log |
 | POST | `/api/inventory/restock` · `/adjust` · `/transfer` | STOCK_WRITE | Change stock |
 | POST | `/api/orders` | ORDER_PLACE | Place order (reserves stock) |
 | GET | `/api/orders/my?sort=&status=&updated_within_days=` | ORDER_READ_OWN | My orders |
 | GET | `/api/orders?search=&status=&delivery_status=&outlet_id=&sort=&updated_within_days=` | ORDER_READ_ALL | All orders |
+| GET | `/api/orders/{id}` | owner, or ORDER_READ_ALL | One order with items, payment and delivery |
 | POST | `/api/orders/{id}/pay`, `/api/orders/{id}/cancel` | owner, or ORDER_MANAGE | Payment gateway; cancel |
 | PATCH | `/api/orders/{id}/delivery` | ORDER_MANAGE | Delivery status, courier, tracking, returns |
 | GET | `/api/reports/dashboard`, `/api/reports/quarterly` | REPORT_VIEW | KPIs and report data |
@@ -224,7 +283,7 @@ The UI calls these endpoints (all under `/api`, see `frontend/src/app/core/api.s
 | GET | `/api/users?search=&profile=&status=&sort=&updated_within_days=`, `/api/users/{id}`, `/api/access/profiles`, `/api/access/permissions` | USER_READ | Users and the authorization matrix |
 | POST / PUT / PATCH | `/api/users`, `/api/users/{id}/profiles`, `/api/users/{id}/status`, `/api/users/{id}/unlock` | USER_MANAGE | Create staff, change profiles, disable, unlock |
 
-Sort options use fixed names (e.g. `updated_desc`, `created_desc`, `amount_desc`); anything else is refused with HTTP 422, so user input never becomes SQL.
+40 endpoints in total. Sort options use fixed names (e.g. `updated_desc`, `created_desc`, `amount_desc`); anything else is refused with HTTP 422, so user input never becomes SQL.
 
 ## Project structure
 
@@ -247,13 +306,29 @@ backend/
   app/services/            BUSINESS LOGIC: users, catalog, inventory, orders, payment_gateway
   setup_db.py, load_dataset.py, tests/test_api.py
 frontend/
+  public/products/         product photos (<SKU>.jpg), icon pictures (<SKU>.svg), placeholder.svg
   proxy.conf.json          local: /api -> http://localhost:8000
   vercel.json              online: /api -> the laptop's ngrok address, plus security headers
   src/app/core/            api.service (every API endpoint the UI calls), auth.service, auth.interceptor
                            (CSRF header), guards (permission per page), models
   src/app/pages/           login, register, profile, shop, cart, checkout, my-orders
   src/app/pages/admin/     dashboard, products, inventory, orders, reports, users (users & access)
+tools/
+  generate_dataset.py      makes the 50,000-customer CSV data set (simulation of the shop)
+  validate_dataset.py      independent checker of the CSV files
+  generate_product_images.py / add_product_photos.py   product icon pictures / real photos
+  build_run_local.py       builds run-local/oracle21c and run-local/oracle26ai from the code above
+docs/
+  ORACLE_SETUP.md          installing Oracle 21c / 26ai and SQL Developer, troubleshooting
+  DEPLOY_VERCEL.md         putting the website online
+  screenshots/             a picture of every page
+run-local/oracle21c, run-local/oracle26ai   complete copies for a Windows laptop, with double-click scripts:
+  1-install, 2-setup-database, START-APP, START-ONLINE (Vercel + ngrok), 3-start-backend, 4-start-website,
+  5-reset-demo-data, 6-load-big-dataset, UPDATE (get the latest version)
 ```
+
+Screenshots of every page (shop, cart, payment, orders, dashboard, inventory, products, reports, users & access,
+authorization matrix, profile, login, sign-up) are in [`docs/screenshots/`](docs/screenshots/).
 
 ## Viva / Q&A preparation
 
@@ -290,6 +365,13 @@ Yes: a **REST API** with JSON. Angular components call `ApiService` (the list of
 - **Order:** `PENDING_PAYMENT` → `PAID` → `CANCELLED` (before shipping) or `RETURNED` (after shipping).
 - **Delivery:** only moves forward.
 - **Unpaid orders:** cancelled after 30 minutes, and their stock is released.
+
+**What kind of system is it, and is it a DSS?**
+It is a perpetual, multi-outlet inventory and order management system: a **TPS** (it records every transaction
+reliably) with **MIS** reporting (dashboard, low-stock alerts, quarterly reports with charts, Excel download). It
+reports *what happened*; a **DSS** would also suggest *what to do*: forecast next quarter, reorder suggestions from
+sales speed and days of stock left, ABC analysis, what-if price or demand changes. That is the natural next step,
+built on the same data and views.
 
 **How would this go to production?**
 1. Use a strong `JWT_SECRET` (`START-ONLINE.bat` creates one), a least-privilege database account, and a real payment gateway with webhooks.
