@@ -192,16 +192,18 @@ erDiagram
   AUTHORIZATIONS { int profile_id PK,FK; int permission_id PK,FK; datetime granted_at; int granted_by FK }
   USER_PROFILES { int user_id PK,FK; int profile_id PK,FK; datetime assigned_at; int assigned_by FK }
   OUTLETS { int outlet_id PK; string name UK; string city }
-  PRODUCTS { int product_id PK; string sku UK; string name; decimal price; int reorder_level; bool is_active; datetime updated_at }
+  PRODUCTS { int product_id PK; int category_id FK; int supplier_id FK; string sku UK; string name; decimal price; int reorder_level; bool is_active; datetime updated_at }
   INVENTORY { int inventory_id PK; int product_id FK; int outlet_id FK; int quantity "CHECK >= 0"; datetime updated_at }
-  STOCK_MOVEMENTS { int movement_id PK; int qty_change; string movement_type; int order_id FK; int user_id FK; datetime created_at }
+  STOCK_MOVEMENTS { int movement_id PK; int product_id FK; int outlet_id FK; int qty_change; string movement_type; int order_id FK; int user_id FK; datetime created_at }
   ORDERS { int order_id PK; int customer_id FK; int outlet_id FK; string order_status; decimal total_amount; datetime created_at; datetime updated_at }
   ORDER_ITEMS { int order_item_id PK; int order_id FK; int product_id FK; int quantity; decimal unit_price }
   PAYMENTS { int payment_id PK; int order_id FK,UK; string payment_status; string payment_method; string transaction_ref UK }
   DELIVERIES { int delivery_id PK; int order_id FK,UK; string delivery_status; string courier; string tracking_number }
   CATEGORIES { int category_id PK; string name UK }
-  SUPPLIERS { int supplier_id PK; string name UK }
+  SUPPLIERS { int supplier_id PK; string name UK; string contact_email }
 ```
+
+The same diagram with all primary keys (PK), foreign keys (FK) and unique columns (UK), as used on the slide: [docs/ERD.png](docs/ERD.png).
 
 **How a user connects to the other tables** (every link is a foreign key to `USERS.USER_ID`):
 
