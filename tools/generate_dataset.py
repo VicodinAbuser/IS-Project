@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "database" / "dataset"
+PHOTOS = ROOT / "frontend" / "public" / "products"   # real photos (tools/add_product_photos.py); else the icon .svg
 
 SEED = 2026
 N_CUSTOMERS = 50_000
@@ -292,7 +293,7 @@ def build_master():
             if sku in INACTIVE_SKUS else None
         products.append({
             "product_id": i, "sku": sku, "name": name, "description": desc, "price": price,
-            "image_url": f"/products/{sku}.svg", "reorder_level": 10,
+            "image_url": f"/products/{sku}.jpg" if (PHOTOS / f"{sku}.jpg").exists() else f"/products/{sku}.svg", "reorder_level": 10,
             "is_active": 0 if withdrawn else 1, "category_id": cat_id[cat],
             "supplier_id": sup_id[sup] if sup else "", "created_at": launch - timedelta(days=rng.randint(1, 5)),
             "updated_at": withdrawn or launch - timedelta(days=1),     # hidden from the shop = last change

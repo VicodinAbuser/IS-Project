@@ -102,6 +102,9 @@ BEGIN
 END;
 /
 
+-- Real photos (tools/add_product_photos.py) for these SKUs; the others keep their icon picture.
+UPDATE products SET image_url = '/products/' || sku || '.jpg' WHERE sku IN ('AP-001', 'AP-002', 'AP-003', 'AP-004', 'AP-005', 'AP-006', 'AP-007', 'AP-008', 'AP-009', 'AP-010', 'BC-001', 'BC-002', 'BC-003', 'BC-004', 'BC-005', 'BC-006', 'BC-007', 'BC-008', 'BC-009', 'BC-010', 'BK-001', 'BK-002', 'BK-003', 'BK-004', 'BK-005', 'BK-006', 'BK-007', 'BK-008', 'BK-009', 'BK-010', 'SP-001', 'SP-002', 'SP-003', 'SP-004', 'SP-005', 'SP-006', 'SP-007', 'SP-008', 'SP-009', 'SP-010', 'TG-001', 'TG-002', 'TG-003', 'TG-004', 'TG-005', 'TG-006', 'TG-007', 'TG-008', 'TG-009', 'TG-010');
+
 -- Opening stock + about 260 paid orders spread from 1 January last year until today,
 -- so the quarterly reports have data. Stock changes go through INVENTORY_PKG,
 -- so the audit trigger records them just like real activity.

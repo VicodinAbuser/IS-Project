@@ -10,8 +10,8 @@ PRODUCT_ID,SKU,NAME,DESCRIPTION,PRICE,IMAGE_URL,REORDER_LEVEL,IS_ACTIVE,CATEGORY
 9,HK-001,Steel Water Bottle 1L,"Insulated, keeps cold 24h",599.00,/products/HK-001.svg,10,1,3,3,2024-12-01 00:00:00,2024-12-03 00:00:00
 10,HK-002,Non-stick Frying Pan,"28cm, induction ready",1299.00,/products/HK-002.svg,10,1,3,3,2024-11-27 00:00:00,2024-11-30 00:00:00
 11,HK-003,Coffee Mug Set,Set of 4 ceramic mugs,799.00,/products/HK-003.svg,10,1,3,3,2024-11-25 00:00:00,2024-11-25 00:00:00
-12,AP-001,Cotton T-Shirt,"Unisex, 100% cotton",499.00,/products/AP-001.svg,10,1,4,,2024-12-05 00:00:00,2024-12-09 00:00:00
-13,AP-002,Hoodie,Fleece-lined pullover,1499.00,/products/AP-002.svg,10,1,4,,2024-11-29 00:00:00,2024-12-02 00:00:00
+12,AP-001,Cotton T-Shirt,"Unisex, 100% cotton",499.00,/products/AP-001.jpg,10,1,4,,2024-12-05 00:00:00,2024-12-09 00:00:00
+13,AP-002,Hoodie,Fleece-lined pullover,1499.00,/products/AP-002.jpg,10,1,4,,2024-11-29 00:00:00,2024-12-02 00:00:00
 14,EL-006,Smart Watch,"AMOLED display, heart-rate monitor",4999.00,/products/EL-006.svg,10,1,1,4,2026-01-31 22:53:37,2026-02-02 22:53:37
 15,EL-007,Wireless Earbuds,"Bluetooth 5.3, 24h with case",1999.00,/products/EL-007.svg,10,1,1,4,2025-08-02 05:22:55,2025-08-05 05:22:55
 16,EL-008,Portable Bluetooth Speaker,"Waterproof, 12h battery",2299.00,/products/EL-008.svg,10,1,1,4,2025-11-11 12:59:24,2025-11-11 12:59:24
@@ -40,51 +40,51 @@ PRODUCT_ID,SKU,NAME,DESCRIPTION,PRICE,IMAGE_URL,REORDER_LEVEL,IS_ACTIVE,CATEGORY
 39,HK-010,Lunch Box (3 compartments),"Leak-proof, insulated bag",549.00,/products/HK-010.svg,10,1,3,3,2026-05-18 23:52:14,2026-05-21 23:52:14
 40,HK-011,Bath Towel Set,"2 towels, 500 GSM cotton",899.00,/products/HK-011.svg,10,1,3,3,2025-11-04 02:07:57,2025-11-07 02:07:57
 41,HK-012,Dinner Plate Set,"Set of 6, melamine",1599.00,/products/HK-012.svg,10,1,3,10,2026-04-22 03:16:59,2026-04-26 03:16:59
-42,AP-003,Denim Jeans,"Slim fit, stretchable",1799.00,/products/AP-003.svg,10,1,4,12,2024-12-05 00:00:00,2024-12-06 00:00:00
-43,AP-004,Formal Shirt,"Cotton blend, wrinkle-free",1199.00,/products/AP-004.svg,10,1,4,5,2025-07-03 14:12:48,2025-07-06 14:12:48
-44,AP-005,Kurta,"Printed cotton, regular fit",999.00,/products/AP-005.svg,10,1,4,5,2024-12-02 00:00:00,2024-12-05 00:00:00
-45,AP-006,Running Shoes,"Cushioned sole, breathable mesh",2999.00,/products/AP-006.svg,10,1,4,12,2024-12-09 00:00:00,2024-12-09 00:00:00
-46,AP-007,Winter Jacket,"Water-resistant, padded",3499.00,/products/AP-007.svg,10,1,4,12,2026-05-26 06:57:36,2026-05-26 06:57:36
-47,AP-008,Track Pants,"Quick-dry, zip pockets",899.00,/products/AP-008.svg,10,1,4,5,2024-11-29 00:00:00,2024-12-02 00:00:00
-48,AP-009,Socks (Pack of 5),"Cotton, ankle length",299.00,/products/AP-009.svg,10,1,4,12,2024-11-23 00:00:00,2024-11-27 00:00:00
-49,AP-010,Baseball Cap,Adjustable strap,449.00,/products/AP-010.svg,10,1,4,5,2024-11-19 00:00:00,2024-11-23 00:00:00
-50,SP-001,Yoga Mat 6mm,"Anti-slip, with carry strap",799.00,/products/SP-001.svg,10,1,5,6,2025-09-22 06:58:52,2025-09-23 06:58:52
-51,SP-002,Dumbbell Set 10kg,"Adjustable, PVC coated",1899.00,/products/SP-002.svg,10,1,5,6,2024-11-29 00:00:00,2024-11-29 00:00:00
-52,SP-003,Skipping Rope,"Ball bearing, adjustable length",249.00,/products/SP-003.svg,10,1,5,6,2025-02-18 07:07:27,2025-02-22 07:07:27
-53,SP-004,Cricket Bat (Kashmir Willow),"Full size, with cover",1599.00,/products/SP-004.svg,10,1,5,6,2024-11-20 00:00:00,2024-11-21 00:00:00
-54,SP-005,Football Size 5,Machine stitched,699.00,/products/SP-005.svg,10,1,5,6,2025-02-05 13:00:25,2025-02-09 13:00:25
-55,SP-006,Badminton Racquet Pair,With 3 shuttlecocks,1299.00,/products/SP-006.svg,10,1,5,6,2026-05-04 17:26:59,2026-05-05 17:26:59
-56,SP-007,Resistance Bands Set,"5 levels, with door anchor",599.00,/products/SP-007.svg,10,1,5,6,2025-08-15 20:02:49,2025-08-18 20:02:49
-57,SP-008,Gym Bag,"Shoe compartment, 40L",999.00,/products/SP-008.svg,10,1,5,6,2025-08-14 08:10:15,2025-08-15 08:10:15
-58,SP-009,Sipper Bottle 750ml,BPA-free,349.00,/products/SP-009.svg,10,1,5,6,2024-11-23 00:00:00,2024-11-26 00:00:00
-59,SP-010,Fitness Tracker Band,"Step, sleep and SpO2 tracking",1799.00,/products/SP-010.svg,10,1,5,4,2024-11-22 00:00:00,2024-11-25 00:00:00
-60,BC-001,Face Wash 150ml,"Neem and tulsi, oil control",249.00,/products/BC-001.svg,10,1,6,7,2024-11-23 00:00:00,2024-11-25 00:00:00
-61,BC-002,Moisturiser 200ml,"Non-greasy, SPF 15",349.00,/products/BC-002.svg,10,1,6,7,2025-05-29 03:17:53,2025-05-29 03:17:53
-62,BC-003,Shampoo 340ml,Anti-dandruff,299.00,/products/BC-003.svg,10,1,6,7,2025-08-27 02:54:37,2025-08-28 02:54:37
-63,BC-004,Sunscreen SPF 50,"Matte finish, 50g",449.00,/products/BC-004.svg,10,1,6,7,2024-12-04 00:00:00,2024-12-06 00:00:00
-64,BC-005,Electric Trimmer,"60 min runtime, 20 length settings",1499.00,/products/BC-005.svg,10,1,6,4,2025-11-03 06:21:40,2025-11-03 06:21:40
-65,BC-006,Hair Dryer 1200W,"2 heat settings, foldable",1199.00,/products/BC-006.svg,10,1,6,4,2024-11-22 00:00:00,2024-11-23 00:00:00
-66,BC-007,Perfume 100ml,Long-lasting eau de parfum,899.00,/products/BC-007.svg,10,1,6,7,2026-01-09 04:59:56,2026-01-10 04:59:56
-67,BC-008,Lip Balm (Pack of 3),Shea butter,199.00,/products/BC-008.svg,10,1,6,7,2024-11-27 00:00:00,2024-11-28 00:00:00
-68,BC-009,Toothbrush (Pack of 4),Soft bristles,179.00,/products/BC-009.svg,10,1,6,7,2024-11-29 00:00:00,2024-11-30 00:00:00
-69,BC-010,Hand Wash Refill 750ml,Antibacterial,159.00,/products/BC-010.svg,10,1,6,7,2024-11-29 00:00:00,2024-12-01 00:00:00
-70,BK-001,Database System Concepts,"Textbook, 7th edition, paperback",899.00,/products/BK-001.svg,10,1,7,8,2024-11-30 00:00:00,2024-12-01 00:00:00
-71,BK-002,Learning Python,Beginner to intermediate guide,1299.00,/products/BK-002.svg,10,1,7,8,2024-11-26 00:00:00,2024-11-28 00:00:00
-72,BK-003,Management Information Systems,"Textbook, paperback",799.00,/products/BK-003.svg,10,1,7,8,2024-12-07 00:00:00,2024-12-08 00:00:00
-73,BK-004,The Art of Problem Solving,Puzzles and strategies,499.00,/products/BK-004.svg,10,1,7,8,2024-11-20 00:00:00,2024-11-24 00:00:00
-74,BK-005,Indian History: A Short Guide,"Illustrated, paperback",399.00,/products/BK-005.svg,10,0,7,8,2025-07-07 05:05:02,2026-06-18 22:02:53
-75,BK-006,Personal Finance Basics,"Budgeting, saving and investing",349.00,/products/BK-006.svg,10,1,7,8,2024-11-21 00:00:00,2024-11-22 00:00:00
-76,BK-007,Children's Story Collection,50 bedtime stories,299.00,/products/BK-007.svg,10,1,7,8,2024-12-06 00:00:00,2024-12-08 00:00:00
-77,BK-008,English Grammar Workbook,Exercises with answers,279.00,/products/BK-008.svg,10,1,7,8,2026-05-17 17:19:40,2026-05-20 17:19:40
-78,BK-009,Cookbook: Everyday Indian Meals,"100 recipes, colour photos",599.00,/products/BK-009.svg,10,1,7,8,2025-02-25 16:18:56,2025-02-28 16:18:56
-79,BK-010,Quantitative Aptitude Guide,For competitive exams,649.00,/products/BK-010.svg,10,1,7,8,2024-11-29 00:00:00,2024-12-01 00:00:00
-80,TG-001,Building Blocks Set (500 pcs),"Ages 6+, compatible bricks",1199.00,/products/TG-001.svg,10,1,8,9,2026-05-14 16:02:42,2026-05-16 16:02:42
-81,TG-002,Chess Board Set,"Wooden, folding board",699.00,/products/TG-002.svg,10,1,8,9,2024-12-07 00:00:00,2024-12-11 00:00:00
-82,TG-003,Jigsaw Puzzle 1000 pcs,Landscape scene,599.00,/products/TG-003.svg,10,1,8,9,2024-12-10 00:00:00,2024-12-10 00:00:00
-83,TG-004,Remote Control Car,"Rechargeable, 2.4GHz",1899.00,/products/TG-004.svg,10,1,8,9,2024-12-09 00:00:00,2024-12-10 00:00:00
-84,TG-005,Board Game: Business Tycoon,2-6 players,799.00,/products/TG-005.svg,10,1,8,9,2026-06-13 06:07:59,2026-06-15 06:07:59
-85,TG-006,Soft Toy Teddy Bear,"30cm, washable",499.00,/products/TG-006.svg,10,1,8,9,2025-07-29 07:48:25,2025-08-01 07:48:25
-86,TG-007,Rubik's-style Speed Cube,"3x3, smooth turning",299.00,/products/TG-007.svg,10,1,8,9,2026-01-05 05:38:59,2026-01-06 05:38:59
-87,TG-008,Art and Craft Kit,"Colours, clay and stencils",899.00,/products/TG-008.svg,10,1,8,9,2024-11-20 00:00:00,2024-11-24 00:00:00
-88,TG-009,Card Game: UNO-style Colours,112 cards,199.00,/products/TG-009.svg,10,0,8,9,2024-12-07 00:00:00,2026-04-25 12:21:43
-89,TG-010,Kids Science Kit,"25 experiments, ages 8+",1299.00,/products/TG-010.svg,10,1,8,9,2024-12-01 00:00:00,2024-12-03 00:00:00
+42,AP-003,Denim Jeans,"Slim fit, stretchable",1799.00,/products/AP-003.jpg,10,1,4,12,2024-12-05 00:00:00,2024-12-06 00:00:00
+43,AP-004,Formal Shirt,"Cotton blend, wrinkle-free",1199.00,/products/AP-004.jpg,10,1,4,5,2025-07-03 14:12:48,2025-07-06 14:12:48
+44,AP-005,Kurta,"Printed cotton, regular fit",999.00,/products/AP-005.jpg,10,1,4,5,2024-12-02 00:00:00,2024-12-05 00:00:00
+45,AP-006,Running Shoes,"Cushioned sole, breathable mesh",2999.00,/products/AP-006.jpg,10,1,4,12,2024-12-09 00:00:00,2024-12-09 00:00:00
+46,AP-007,Winter Jacket,"Water-resistant, padded",3499.00,/products/AP-007.jpg,10,1,4,12,2026-05-26 06:57:36,2026-05-26 06:57:36
+47,AP-008,Track Pants,"Quick-dry, zip pockets",899.00,/products/AP-008.jpg,10,1,4,5,2024-11-29 00:00:00,2024-12-02 00:00:00
+48,AP-009,Socks (Pack of 5),"Cotton, ankle length",299.00,/products/AP-009.jpg,10,1,4,12,2024-11-23 00:00:00,2024-11-27 00:00:00
+49,AP-010,Baseball Cap,Adjustable strap,449.00,/products/AP-010.jpg,10,1,4,5,2024-11-19 00:00:00,2024-11-23 00:00:00
+50,SP-001,Yoga Mat 6mm,"Anti-slip, with carry strap",799.00,/products/SP-001.jpg,10,1,5,6,2025-09-22 06:58:52,2025-09-23 06:58:52
+51,SP-002,Dumbbell Set 10kg,"Adjustable, PVC coated",1899.00,/products/SP-002.jpg,10,1,5,6,2024-11-29 00:00:00,2024-11-29 00:00:00
+52,SP-003,Skipping Rope,"Ball bearing, adjustable length",249.00,/products/SP-003.jpg,10,1,5,6,2025-02-18 07:07:27,2025-02-22 07:07:27
+53,SP-004,Cricket Bat (Kashmir Willow),"Full size, with cover",1599.00,/products/SP-004.jpg,10,1,5,6,2024-11-20 00:00:00,2024-11-21 00:00:00
+54,SP-005,Football Size 5,Machine stitched,699.00,/products/SP-005.jpg,10,1,5,6,2025-02-05 13:00:25,2025-02-09 13:00:25
+55,SP-006,Badminton Racquet Pair,With 3 shuttlecocks,1299.00,/products/SP-006.jpg,10,1,5,6,2026-05-04 17:26:59,2026-05-05 17:26:59
+56,SP-007,Resistance Bands Set,"5 levels, with door anchor",599.00,/products/SP-007.jpg,10,1,5,6,2025-08-15 20:02:49,2025-08-18 20:02:49
+57,SP-008,Gym Bag,"Shoe compartment, 40L",999.00,/products/SP-008.jpg,10,1,5,6,2025-08-14 08:10:15,2025-08-15 08:10:15
+58,SP-009,Sipper Bottle 750ml,BPA-free,349.00,/products/SP-009.jpg,10,1,5,6,2024-11-23 00:00:00,2024-11-26 00:00:00
+59,SP-010,Fitness Tracker Band,"Step, sleep and SpO2 tracking",1799.00,/products/SP-010.jpg,10,1,5,4,2024-11-22 00:00:00,2024-11-25 00:00:00
+60,BC-001,Face Wash 150ml,"Neem and tulsi, oil control",249.00,/products/BC-001.jpg,10,1,6,7,2024-11-23 00:00:00,2024-11-25 00:00:00
+61,BC-002,Moisturiser 200ml,"Non-greasy, SPF 15",349.00,/products/BC-002.jpg,10,1,6,7,2025-05-29 03:17:53,2025-05-29 03:17:53
+62,BC-003,Shampoo 340ml,Anti-dandruff,299.00,/products/BC-003.jpg,10,1,6,7,2025-08-27 02:54:37,2025-08-28 02:54:37
+63,BC-004,Sunscreen SPF 50,"Matte finish, 50g",449.00,/products/BC-004.jpg,10,1,6,7,2024-12-04 00:00:00,2024-12-06 00:00:00
+64,BC-005,Electric Trimmer,"60 min runtime, 20 length settings",1499.00,/products/BC-005.jpg,10,1,6,4,2025-11-03 06:21:40,2025-11-03 06:21:40
+65,BC-006,Hair Dryer 1200W,"2 heat settings, foldable",1199.00,/products/BC-006.jpg,10,1,6,4,2024-11-22 00:00:00,2024-11-23 00:00:00
+66,BC-007,Perfume 100ml,Long-lasting eau de parfum,899.00,/products/BC-007.jpg,10,1,6,7,2026-01-09 04:59:56,2026-01-10 04:59:56
+67,BC-008,Lip Balm (Pack of 3),Shea butter,199.00,/products/BC-008.jpg,10,1,6,7,2024-11-27 00:00:00,2024-11-28 00:00:00
+68,BC-009,Toothbrush (Pack of 4),Soft bristles,179.00,/products/BC-009.jpg,10,1,6,7,2024-11-29 00:00:00,2024-11-30 00:00:00
+69,BC-010,Hand Wash Refill 750ml,Antibacterial,159.00,/products/BC-010.jpg,10,1,6,7,2024-11-29 00:00:00,2024-12-01 00:00:00
+70,BK-001,Database System Concepts,"Textbook, 7th edition, paperback",899.00,/products/BK-001.jpg,10,1,7,8,2024-11-30 00:00:00,2024-12-01 00:00:00
+71,BK-002,Learning Python,Beginner to intermediate guide,1299.00,/products/BK-002.jpg,10,1,7,8,2024-11-26 00:00:00,2024-11-28 00:00:00
+72,BK-003,Management Information Systems,"Textbook, paperback",799.00,/products/BK-003.jpg,10,1,7,8,2024-12-07 00:00:00,2024-12-08 00:00:00
+73,BK-004,The Art of Problem Solving,Puzzles and strategies,499.00,/products/BK-004.jpg,10,1,7,8,2024-11-20 00:00:00,2024-11-24 00:00:00
+74,BK-005,Indian History: A Short Guide,"Illustrated, paperback",399.00,/products/BK-005.jpg,10,0,7,8,2025-07-07 05:05:02,2026-06-18 22:02:53
+75,BK-006,Personal Finance Basics,"Budgeting, saving and investing",349.00,/products/BK-006.jpg,10,1,7,8,2024-11-21 00:00:00,2024-11-22 00:00:00
+76,BK-007,Children's Story Collection,50 bedtime stories,299.00,/products/BK-007.jpg,10,1,7,8,2024-12-06 00:00:00,2024-12-08 00:00:00
+77,BK-008,English Grammar Workbook,Exercises with answers,279.00,/products/BK-008.jpg,10,1,7,8,2026-05-17 17:19:40,2026-05-20 17:19:40
+78,BK-009,Cookbook: Everyday Indian Meals,"100 recipes, colour photos",599.00,/products/BK-009.jpg,10,1,7,8,2025-02-25 16:18:56,2025-02-28 16:18:56
+79,BK-010,Quantitative Aptitude Guide,For competitive exams,649.00,/products/BK-010.jpg,10,1,7,8,2024-11-29 00:00:00,2024-12-01 00:00:00
+80,TG-001,Building Blocks Set (500 pcs),"Ages 6+, compatible bricks",1199.00,/products/TG-001.jpg,10,1,8,9,2026-05-14 16:02:42,2026-05-16 16:02:42
+81,TG-002,Chess Board Set,"Wooden, folding board",699.00,/products/TG-002.jpg,10,1,8,9,2024-12-07 00:00:00,2024-12-11 00:00:00
+82,TG-003,Jigsaw Puzzle 1000 pcs,Landscape scene,599.00,/products/TG-003.jpg,10,1,8,9,2024-12-10 00:00:00,2024-12-10 00:00:00
+83,TG-004,Remote Control Car,"Rechargeable, 2.4GHz",1899.00,/products/TG-004.jpg,10,1,8,9,2024-12-09 00:00:00,2024-12-10 00:00:00
+84,TG-005,Board Game: Business Tycoon,2-6 players,799.00,/products/TG-005.jpg,10,1,8,9,2026-06-13 06:07:59,2026-06-15 06:07:59
+85,TG-006,Soft Toy Teddy Bear,"30cm, washable",499.00,/products/TG-006.jpg,10,1,8,9,2025-07-29 07:48:25,2025-08-01 07:48:25
+86,TG-007,Rubik's-style Speed Cube,"3x3, smooth turning",299.00,/products/TG-007.jpg,10,1,8,9,2026-01-05 05:38:59,2026-01-06 05:38:59
+87,TG-008,Art and Craft Kit,"Colours, clay and stencils",899.00,/products/TG-008.jpg,10,1,8,9,2024-11-20 00:00:00,2024-11-24 00:00:00
+88,TG-009,Card Game: UNO-style Colours,112 cards,199.00,/products/TG-009.jpg,10,0,8,9,2024-12-07 00:00:00,2026-04-25 12:21:43
+89,TG-010,Kids Science Kit,"25 experiments, ages 8+",1299.00,/products/TG-010.jpg,10,1,8,9,2024-12-01 00:00:00,2024-12-03 00:00:00
