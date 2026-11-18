@@ -18,8 +18,7 @@ export class LoginComponent implements OnInit {
   error = signal('');
   loading = signal(false);
   showPassword = signal(false);
-  serverStatus = signal<'checking' | 'ok' | 'nodb' | 'fail'>('checking');
-  oracleVersion = signal('');
+  serverDown = signal(false);
 
   // Typed in by the user: nothing is filled in automatically.
   form = inject(FormBuilder).nonNullable.group({
@@ -29,12 +28,11 @@ export class LoginComponent implements OnInit {
 
   ngOnInit() { this.testServer(); }
 
-  /** Is the backend (and, through it, Oracle) reachable? */
+  /** Only tells the user something when the server can't be reached; customers don't need technical details. */
   testServer() {
-    this.serverStatus.set('checking');
     this.api.health().subscribe({
-      next: h => { this.oracleVersion.set(h.oracle_version); this.serverStatus.set('ok'); },
-      error: err => this.serverStatus.set(err.status === 503 ? 'nodb' : 'fail'),
+      next: () => this.serverDown.set(false),
+      error: () => this.serverDown.set(true),
     });
   }
 

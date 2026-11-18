@@ -285,7 +285,7 @@ The UI calls these endpoints (all under `/api`, see `frontend/src/app/core/api.s
 | POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | public | Sets / clears the HttpOnly session cookie |
 | POST | `/api/auth/token` | public | Bearer token for Swagger's **Authorize** button and scripts |
 | GET / PUT | `/api/auth/me` | logged in | Who am I (profiles, permissions); edit my details |
-| GET | `/api/health` | public | Is the API up and can it reach Oracle? (shown on the login page) |
+| GET | `/api/health` | public | Is the API up and can it reach Oracle? Answers only `ok` / `error`; the login page shows a message only if it fails. Staff see the Oracle version on the dashboard |
 | GET | `/api/outlets`, `/api/categories` | public | Lookups (sign-up page, shop filters) |
 | GET | `/api/suppliers` | CATALOG_WRITE | Supplier list for the product form |
 | GET | `/api/products?search=&category_id=&outlet_id=&sort=&updated_within_days=`, `/api/products/{id}` | CATALOG_READ | Catalogue with stock |

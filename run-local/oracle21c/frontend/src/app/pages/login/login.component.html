@@ -1,6 +1,11 @@
 <div class="auth card">
-  <h1>Welcome back</h1>
-  <p class="muted">Sign in to the inventory management system</p>
+  <h1>Sign in</h1>
+  @if (serverDown()) {
+    <div class="alert error" role="alert">
+      We can’t connect right now. Please try again in a moment.
+      <button class="link" type="button" (click)="testServer()">Try again</button>
+    </div>
+  }
   @if (expired()) { <div class="alert warn">Your session has ended. Please sign in again.</div> }
   @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -19,14 +24,4 @@
     <button class="btn full" type="submit" [disabled]="form.invalid || loading()">{{ loading() ? 'Signing in…' : 'Sign in' }}</button>
   </form>
   <p class="muted">New customer? <a routerLink="/register">Create an account</a></p>
-  <div class="server">
-    <span class="muted">Server:</span>
-    @switch (serverStatus()) {
-      @case ('checking') { <span class="badge">checking…</span> }
-      @case ('ok') { <span class="badge success">connected to Oracle {{ oracleVersion() }}</span> }
-      @case ('nodb') { <span class="badge warning">backend up, Oracle not reachable</span> }
-      @case ('fail') { <span class="badge danger">backend not reachable</span> }
-    }
-    <button class="link" type="button" (click)="testServer()">Test again</button>
-  </div>
 </div>

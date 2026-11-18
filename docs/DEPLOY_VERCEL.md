@@ -46,13 +46,13 @@ From now on, every `git push` to GitHub redeploys the website automatically.
 Double-click **`START-ONLINE.bat`** (in `run-local\oracle21c` or `run-local\oracle26ai`). It starts the backend
 (unless `START-APP.bat` already did) and the ngrok tunnel. Keep both windows open. To go offline: Ctrl+C in the ngrok window.
 
-Check: open your Vercel link. The login page shows **Server: connected to Oracle**.
+Check: open your Vercel link and sign in as staff. The dashboard shows **Database: Oracle 21.x**.
+(Customers don't see any server details; the login page only shows a message if something is wrong.)
 
-| Login page shows | Meaning |
+| What you see | Meaning |
 |---|---|
-| connected to Oracle | Everything works |
-| backend up, Oracle not reachable | Start Oracle on the laptop (Windows Services → OracleServiceORCL) |
-| backend not reachable | `START-ONLINE.bat` isn't running, the laptop is asleep, or the domain in `vercel.json` is wrong |
+| Login page: "We can't connect right now" | `START-ONLINE.bat` isn't running, the laptop is asleep, the domain in `vercel.json` is wrong, or Oracle is stopped |
+| To tell which: open `http://localhost:8000/api/health` on the laptop | `{"status":"ok"}` = all fine; no answer = backend not running; `"error"` = start Oracle (Windows Services → OracleServiceORCL). The backend window prints the exact Oracle error |
 
 ## Security of the public link
 - Sessions are HttpOnly cookies; changes need the `X-Requested-With` header (CSRF protection);

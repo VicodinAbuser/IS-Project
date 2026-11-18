@@ -292,7 +292,9 @@ def test_survives_package_recompile(client):
 
 def test_health_checks_oracle(client):
     r = client.get("/api/health")
-    assert r.status_code == 200 and r.json()["oracle_version"][:2].isdigit()
+    assert r.status_code == 200 and r.json() == {"status": "ok"}      # nothing about the database is public
+    admin = auth(client, "admin@test.com", "admin123")
+    assert client.get("/api/reports/dashboard", headers=admin).json()["oracle_version"][:2].isdigit()
 
 
 def test_sorting_and_latest_updated_filter(client):

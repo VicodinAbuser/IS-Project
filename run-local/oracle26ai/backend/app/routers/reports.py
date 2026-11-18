@@ -26,7 +26,8 @@ def dashboard(db: oracledb.Connection = Depends(get_db), _: dict = Depends(requi
                (SELECT COUNT(*) FROM products WHERE is_active = 1)                                   AS products,
                (SELECT COUNT(*) FROM outlets)                                                         AS outlets,
                (SELECT NVL(SUM(quantity), 0) FROM inventory)                                         AS total_units_in_stock,
-               (SELECT COUNT(*) FROM v_inventory_status WHERE low_stock = 1)                         AS low_stock_items
+               (SELECT COUNT(*) FROM v_inventory_status WHERE low_stock = 1)                         AS low_stock_items,
+               (SELECT version_full FROM product_component_version WHERE ROWNUM = 1)                 AS oracle_version
           FROM dual""")
 
 

@@ -217,7 +217,7 @@ To go back to the small demo data, run `5-reset-demo-data.bat`. Details: `databa
 | `ORA-01109: database not open` | See [ORACLE_SETUP.md](ORACLE_SETUP.md), Part A, step 6 (`ALTER PLUGGABLE DATABASE ALL OPEN; ... SAVE STATE;`) |
 | Website says *Cannot reach the server* | The Backend window was closed or shows an error. Run `3-start-backend.bat`. |
 | Website says *Cannot connect to the Oracle database* | Backend is fine but Oracle isn't running (see above) |
-| Login page shows **Server: backend up, Oracle not reachable** | Same: start Oracle |
+| Login page says **We can’t connect right now**, and `http://localhost:8000/api/health` answers `"error"` | Same: start Oracle (the backend window prints the exact error) |
 | *Too many wrong passwords* | The account is locked for 15 minutes after 5 wrong passwords. An admin can unlock it in **Users & access**. |
 | The website hangs on a save after you used SQL Developer | You changed a row there without `COMMIT;` / `ROLLBACK;`. Run one of them in SQL Developer. |
 | Browser page is blank or can't connect | The website is still starting. Wait for "Local: http://localhost:4200/" in the Website window and refresh. |

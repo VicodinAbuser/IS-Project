@@ -97,15 +97,15 @@ for r in (auth, users, catalog, inventory, orders, reports):
 
 @app.get("/api/health", tags=["Health"])
 def health():
-    """Checks the whole chain: this API is up AND Oracle answers a query."""
+    """Public check that the API is up AND Oracle answers a query. It says only "ok" or "error":
+    the database name, address and version are not shown to the public (staff see them on the dashboard)."""
     session = get_db()
     try:
         conn = next(session)
-        db_version = query_one(conn, "SELECT version_full FROM product_component_version WHERE ROWNUM = 1")
+        query_one(conn, "SELECT 1 AS ok FROM dual")
     except oracledb.Error as exc:
-        return JSONResponse(status_code=503, content={
-            "status": "error", "database": settings.oracle_dsn,
-            "detail": f"API is running but cannot reach Oracle: {str(exc).splitlines()[0]}"})
+        print(f"Health check: cannot reach Oracle at {settings.oracle_dsn}: {str(exc).splitlines()[0]}")
+        return JSONResponse(status_code=503, content={"status": "error", "detail": "Service temporarily unavailable"})
     finally:
         session.close()
-    return {"status": "ok", "database": settings.oracle_dsn, "oracle_version": db_version["version_full"]}
+    return {"status": "ok"}

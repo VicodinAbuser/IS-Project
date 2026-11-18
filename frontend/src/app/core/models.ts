@@ -66,7 +66,7 @@ export interface Order {
 
 export interface Dashboard {
   total_revenue: number; paid_orders: number; pending_payment: number; to_ship: number; products: number;
-  outlets: number; total_units_in_stock: number; low_stock_items: number;
+  outlets: number; total_units_in_stock: number; low_stock_items: number; oracle_version: string;
 }
 export interface QuarterlyReport {
   year: number; quarter: number; period: string;

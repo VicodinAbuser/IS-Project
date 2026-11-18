@@ -108,7 +108,7 @@ export class ApiService {
   getProfiles() { return this.http.get<ProfileInfo[]>(`${this.base}/access/profiles`); }
   getPermissions() { return this.http.get<PermissionInfo[]>(`${this.base}/access/permissions`); }
 
-  health() { return this.http.get<{ status: string; oracle_version: string }>(`${this.base}/health`); }
+  health() { return this.http.get<{ status: string }>(`${this.base}/health`); }
 }
 
 /** Turns a backend error into a readable message for the UI. */
